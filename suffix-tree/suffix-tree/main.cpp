@@ -9,9 +9,14 @@
 #include "suffix-tree.h"
 #include <iostream>
 
-int main(int argc, const char * argv[])
-{
-    suffix_tree tree("Hello, World!");
+int main(int argc, const char * argv[]) {
+    string test_cases[] = {"abc", "happy", "bananas", "abcabxabcd"};
+    for (int i=0; i<1; i++) {
+        cout << "\ntest case #" << i << ": \"" << test_cases[i] << "\"\n";
+        suffix_tree tree(test_cases[i]);
+        tree.print_tree();
+    }
+    
     return 0;
 }
 

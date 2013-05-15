@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		8BAE95C416990F7200FB5F68 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8BAE95C316990F7200FB5F68 /* main.cpp */; };
 		8BAE95C616990F7200FB5F68 /* suffix_tree.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 8BAE95C516990F7200FB5F68 /* suffix_tree.1 */; };
+		8BAE95CE16990F9000FB5F68 /* suffix-tree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8BAE95CC16990F9000FB5F68 /* suffix-tree.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,6 +29,8 @@
 		8BAE95BF16990F7200FB5F68 /* suffix-tree */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "suffix-tree"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8BAE95C316990F7200FB5F68 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8BAE95C516990F7200FB5F68 /* suffix_tree.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = suffix_tree.1; sourceTree = "<group>"; };
+		8BAE95CC16990F9000FB5F68 /* suffix-tree.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "suffix-tree.cpp"; sourceTree = "<group>"; };
+		8BAE95CD16990F9000FB5F68 /* suffix-tree.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "suffix-tree.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +64,8 @@
 			isa = PBXGroup;
 			children = (
 				8BAE95C316990F7200FB5F68 /* main.cpp */,
+				8BAE95CC16990F9000FB5F68 /* suffix-tree.cpp */,
+				8BAE95CD16990F9000FB5F68 /* suffix-tree.h */,
 				8BAE95C516990F7200FB5F68 /* suffix_tree.1 */,
 			);
 			path = "suffix-tree";
@@ -118,6 +123,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8BAE95C416990F7200FB5F68 /* main.cpp in Sources */,
+				8BAE95CE16990F9000FB5F68 /* suffix-tree.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -210,6 +216,7 @@
 				8BAE95CB16990F7200FB5F68 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
