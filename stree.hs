@@ -66,7 +66,9 @@ Build a suffix tree in O(n) (all steps are O(n)):
 
 4. Build suffix tree from suffix array and LCP array
 	(i) Construct a Cartesian tree from the LCP array, fusing together nodes with the same values if one becomes a parent of the  other.
-	
+		http://www.stanford.edu/class/cs166/lectures/01/Slides01.pdf
+			#112
+
 	(ii) Run a DFS over the tree and add missing children in the order in which they appear in the suffix array.
 
 	(iii) Assign labels to the edges based on the LCP values.
@@ -77,9 +79,11 @@ Issues:
 	LL, not array => non-linear-time indexing...
 -}
 
+import qualified Data.Map as M
+
+type Array a = M.Map Integer a
 type Index = Integer
--- ([lcplen], [suffix])
-type SuffixLCPArray = ([Integer], [Index])
+type SuffixLCPArray = ([Integer], [Index]) -- ([lcplen], [index of suffix])
 
 -- 1. Build suffix array `S` // O(n)
 -- 2. Build LCP array `L` of adjacent elems in `S`
@@ -87,12 +91,28 @@ type SuffixLCPArray = ([Integer], [Index])
 
 -- 4. Build suffix tree from suffix array and LCP array
 
+s = "nonsense$"
 test_suffix_array_with_strs = [(8, "$"), (7, "e$"), (4, "ense$"), (0, "nonsense$"), (5, "nse$"), (2, "nsense$"), (1, "onsense$"), (6, "se$"), (3, "sense$")]
 test_suffix_array = map fst test_suffix_array_with_strs
 lcps = [0, 1, 0, 1, 3, 0, 0, 2]
 test_suffix_lcp_array :: SuffixLCPArray
 test_suffix_lcp_array = (lcps, test_suffix_array)
 
+
+data Stree
+	= Empty
+	| Leaf
+	| Internal (M.Map String Stree)
+
+data CartesianTree a
+	= Empty
+	| CLeaf a
+	| CInternal a (CartesianTree a) (CartesianTree a)
+
+fromList :: (Ord a) => [a] -> CartesianTree a
+fromList list = fromList' list Cleaf
+
+fromList list = 
 
 
 
