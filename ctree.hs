@@ -1,20 +1,21 @@
-
 module CTree
 ( CTree(..)
 , CTree.fromList
+, CTree.left_child
+, CTree.right_child
+, CTree.value
+, CTree.is_empty
 ) where
 
 import qualified Data.Map as M
 import Stack
 import HLib
 
-type CTree a = CartesianTree a
-
-data CartesianTree a
+data CTree a
 	= Empty
-	| Node a (CartesianTree a) (CartesianTree a) deriving Show
+	| Node a (CTree a) (CTree a) deriving Show
 
-instance (Eq a) => Eq (CartesianTree a) where
+instance (Eq a) => Eq (CTree a) where
 	Empty == Empty = True
 	Empty == _ = False
 	_ == Empty = False
@@ -23,7 +24,7 @@ instance (Eq a) => Eq (CartesianTree a) where
 		&& (left_child  x) == (left_child  y)
 		&& (right_child x) == (right_child y)
 
-instance (Ord a) => Ord (CartesianTree a) where
+instance (Ord a) => Ord (CTree a) where
 	Empty < _ = True
 	_ < Empty = False
 	x < y = (value x) < (value y)
@@ -34,6 +35,10 @@ left_child (Node _ l _) = l
 right_child :: CTree a -> CTree a
 right_child (Node _ _ r) = r
 
+is_empty :: CTree a -> Bool
+is_empty Empty = True
+is_empty _ = False
+
 value :: CTree a -> a
 value Empty = error "Can't get the value out of an empty node."
 value (Node e _ _) = e
@@ -43,9 +48,9 @@ value (Node e _ _) = e
 ---------------------------
 
 -- elem of parent, other child of parent
-data Focus a = L a (CartesianTree a) | R a (CartesianTree a) deriving Show
+data Focus a = L a (CTree a) | R a (CTree a) deriving Show
 type Foci a = [Focus a]
-type Zipper a = (Foci a, CartesianTree a)
+type Zipper a = (Foci a, CTree a)
 
 go_to_top :: Zipper a -> Zipper a
 go_to_top z = if has_parent z

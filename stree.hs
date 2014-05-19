@@ -80,8 +80,14 @@ Issues:
 -}
 
 import qualified Data.Map as M
-import qualified Stack
-import Data.Array
+import qualified Data.Array as A
+
+import qualified CTree
+import qualified FusedCTree
+
+data STree
+	= Leaf Int
+	| Internal (M.Map String STree)
 
 -- 1. Build suffix array `S`
 -- 2. Build LCP array `L` of adjacent elems in `S`
@@ -91,21 +97,43 @@ import Data.Array
 str :: String
 str = "nonsense$"
 
-suffix_array :: Array Int Int
-suffix_array = array (0,8) [(0,8),(1,7),(2,4),(3,0),(4,5),(5,2),(6,1),(7,6),(8,3)]
+---------------------------------------------------------
+--                   Test Structures                   --
+---------------------------------------------------------
 
-test_suffix_lcp_array :: Array Int Int
-test_suffix_lcp_array = get_pairwise_adjacent_lcps str suffix_array
+test_suffix_array :: A.Array Int Int
+test_suffix_array = A.array (0,8) [(0,8),(1,7),(2,4),(3,0),(4,5),(5,2),(6,1),(7,6),(8,3)]
 
---------------------------------------------------------
---               Kasai (pair-wise LCP)                --
---------------------------------------------------------
+test_suffix_lcp_array :: [Int]
+test_suffix_lcp_array = A.elems . get_pairwise_adjacent_lcps str $test_suffix_array
 
-alength :: (Array Int b) -> Int
-alength = snd . bounds
+---------------------------------------------------------
+--          Suffix Array + LCP -> Suffix tree          --
+---------------------------------------------------------
 
-invert :: (Array Int Int) -> (Array Int Int)
-invert arr = array (0, alength arr) $ zip (elems arr) (indices arr)
+construct_stree :: String -> STree
+construct_stree str =
+	let
+		suffix_array :: A.Array Int Int
+		suffix_array = test_suffix_array
+
+		lcps :: A.Array Int Int
+		lcps = get_pairwise_adjacent_lcps str suffix_array
+
+		fused_ctree :: FusedCTree.FusedCTree Int
+		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
+	in
+		Leaf 0
+
+---------------------------------------------------------
+--                Kasai (pair-wise LCP)                --
+---------------------------------------------------------
+
+alength :: (A.Array Int b) -> Int
+alength = snd . A.bounds
+
+invert :: (A.Array Int Int) -> (A.Array Int Int)
+invert arr = A.array (0, alength arr) $ zip (A.elems arr) (A.indices arr)
 
 get_prefix_overlap :: String -> String -> Int
 get_prefix_overlap s1 s2 = length . takeWhile eq $ zip s1 s2
@@ -118,19 +146,19 @@ Citation:
 	T. Kasai, G. Lee, H. Arimura, S. Arikawa, K. Park
 	Linear-time longest-common-prefix computation in suffix arrays and its applications
 -}
-get_pairwise_adjacent_lcps :: String -> (Array Int Int) -> (Array Int Int)
+get_pairwise_adjacent_lcps :: String -> (A.Array Int Int) -> (A.Array Int Int)
 get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
 	where
-		rank :: Array Int Int
+		rank :: A.Array Int Int
 		rank = invert pos
 
 		n :: Int
 		n = (alength pos) - 1
 
-		height_initial :: Array Int Int
-		height_initial = listArray (0, n) $ replicate (n+1) 0
+		height_initial :: A.Array Int Int
+		height_initial = A.listArray (0, n) $ replicate (n+1) 0
 
-		get_height' :: Int -> Int -> (Array Int Int) -> (Array Int Int)
+		get_height' :: Int -> Int -> (A.Array Int Int) -> (A.Array Int Int)
 		get_height' i h height
 			| (i == (alength rank) - 1) = height  -- -1 to skip "$"
 			| otherwise = get_height' (i+1) h' height'
@@ -138,14 +166,10 @@ get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
 					-- drop not O(1)?
 					h'' = get_prefix_overlap (drop i str) (drop k str)
 						where
-							k = pos ! ((rank ! i) - 1)
+							k = pos A.! ((rank A.! i) - 1)
 							
-					height' = height // [((rank ! i) - 1, h'')] -- -1 for 0-indexing
+					height' = height A.// [((rank A.! i) - 1, h'')] -- -1 for 0-indexing
 					h' = if h'' > 0 then h'' - 1 else h''
-
-data STree
-	= Empty
-	| Internal (M.Map String STree)
 
 
 
