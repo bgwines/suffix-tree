@@ -85,23 +85,33 @@ import qualified Data.Array as A
 import qualified CTree
 import qualified FusedCTree
 
+type SuffixArray = A.Array Int Int
+
 data STree
 	= Leaf Int
-	| Internal (M.Map String STree)
+	| Internal (M.Map String STree) deriving Show
+
+index :: STree -> Int
+index (Leaf i) = i
+index (Internal _) = error "Internal nodes don't represent ends of suffixes"
+
+is_leaf :: STree -> Bool
+is_leaf (Leaf _) = True
+is_leaf (Internal _) = False
 
 -- 1. Build suffix array `S`
 -- 2. Build LCP array `L` of adjacent elems in `S`
 -- 3. Build RMQ structure over `L`
 -- 4. Build suffix tree from suffix array and LCP array
 
-str :: String
-str = "nonsense$"
-
 ---------------------------------------------------------
 --                   Test Structures                   --
 ---------------------------------------------------------
 
-test_suffix_array :: A.Array Int Int
+str :: String
+str = "nonsense$"
+
+test_suffix_array :: SuffixArray
 test_suffix_array = A.array (0,8) [(0,8),(1,7),(2,4),(3,0),(4,5),(5,2),(6,1),(7,6),(8,3)]
 
 test_suffix_lcp_array :: [Int]
@@ -112,9 +122,9 @@ test_suffix_lcp_array = A.elems . get_pairwise_adjacent_lcps str $test_suffix_ar
 ---------------------------------------------------------
 
 construct_stree :: String -> STree
-construct_stree str =
-	let
-		suffix_array :: A.Array Int Int
+construct_stree str = suffix_array_to_stree str suffix_array fused_ctree
+	where
+		suffix_array :: SuffixArray
 		suffix_array = test_suffix_array
 
 		lcps :: A.Array Int Int
@@ -122,11 +132,90 @@ construct_stree str =
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
-	in
-		Leaf 0
+
+suffix_array_to_stree :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
+suffix_array_to_stree str suffix_array tree = fst $ fctree_to_stree' str suffix_array tree 0	
+
+{-
+data STree
+	= Leaf Int
+	| Internal (M.Map String STree)
+
+
+suffix_array:
+                       i
+                      /
+                ______
+                |
+                v
+      0           1            2           3             4        
+	["$" (8), "e$" (7), "ense$" (4), "nonsense$" (0), "nse$" (5),
+
+          5                   6            7          8
+		"nsense$" (2), "onsensee$" (1), "se$" (6), "sense$" (3)]
+
+fused_ctree:
+                               
+                         _____/|\_____
+                        /   |  |    | \
+                      [2    @  1    1  @]
+                      /|      /|    |\
+                    [@ @]   [3 @]  [@ @]
+                            / \
+                          [@   @]
+
+
+->
+
+                               _
+                         _____/|\______
+                        /   |  |    |  \
+                     [ se 1(*) n    e   8 ($) ]
+                ______/|      / \    \___________________
+                |      /   [ se  0 (*) ]     |           |
+          [3 (nse$)  6 ($) ] / \          [ 4 (nse$)   7 ($) ]
+                            /   \
+                    [ 2 (nse$)   5 ($) ]
+
+	*:"onsense$"
+
+-}
+
+fctree_to_stree' :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (STree, Int)
+fctree_to_stree' str suffix_array fused_ctree i
+	| (FusedCTree.is_empty fused_ctree) = (Leaf (suffix_array A.! i), i+1)
+	| otherwise = (Internal children, i')
+		where
+			children_with_updated_is :: [(STree, Int)]
+			children_with_updated_is = scanl f (undefined, i) $ FusedCTree.get_children fused_ctree
+				where
+					f :: (STree, Int) -> FusedCTree.FusedCTree Int -> (STree, Int)
+					f (_, i'') child = fctree_to_stree' str suffix_array child i''
+
+			i' :: Int
+			i' = snd . last $ children_with_updated_is
+
+			children :: M.Map String STree
+			children = foldl insert M.empty . map fst $children_with_updated_is
+				where
+					insert :: M.Map String STree -> STree -> M.Map String STree
+					insert m node = M.insert s node m
+						where
+							s :: String
+							s = if is_leaf node
+								-- ! not O(1)
+								then take n . reverse $ str 
+								else
+									-- don't work; keys are unique. It'll overwrite...
+									"" -- for now; we'll do a second pass later that fixes this
+
+							n :: Int
+							n = (length str) - (index node)
+
+
 
 ---------------------------------------------------------
---                Kasai (pair-wise LCP)                --
+--                    Pair-wise LCP                    --
 ---------------------------------------------------------
 
 alength :: (A.Array Int b) -> Int

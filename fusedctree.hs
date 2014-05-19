@@ -6,6 +6,7 @@ module FusedCTree
 , FusedCTree.value
 , FusedCTree.get_children
 , FusedCTree.is_empty
+, FusedCTree.empty
 ) where
 
 import qualified CTree
@@ -13,6 +14,9 @@ import qualified CTree
 data FusedCTree a
 	= Empty
 	| Node a [FusedCTree a] deriving Show
+
+empty :: FusedCTree a
+empty = Empty
 
 is_empty :: (FusedCTree a) -> Bool
 is_empty Empty = True
@@ -40,6 +44,7 @@ fuse cnode
 			r :: CTree.CTree a
 			r = CTree.right_child cnode
 
+			-- TODO: preserve order, here
 			children :: [FusedCTree a]
 			children = nonmatching_children ++ (concat . map get_children $ matching_children)
 				where
