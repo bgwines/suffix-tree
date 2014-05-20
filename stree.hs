@@ -76,7 +76,9 @@ Issues:
 	LL, not array => non-linear-time indexing...
 -}
 
+import qualified Data.Ord as O
 import qualified Data.Map as M
+import qualified Data.List as L
 import qualified Data.Array as A
 
 import qualified CTree
@@ -125,29 +127,36 @@ test_suffix_array = A.array (0,8) [(0,8),(1,7),(2,4),(3,0),(4,5),(5,2),(6,1),(7,
 test_suffix_lcp_array :: [Int]
 test_suffix_lcp_array = A.elems . get_pairwise_adjacent_lcps str $test_suffix_array
 
+----------------------------------------------------------
+--                     Suffix Array                     --
+----------------------------------------------------------
+
+construct_suffix_array :: String -> SuffixArray
+construct_suffix_array str = A.listArray bounds . map fst . L.sortBy (O.comparing snd) . zip [0..] . init . L.tails $ str
+	where
+		bounds :: (Int, Int)
+		bounds = (0, (length str) - 1)
+
 ---------------------------------------------------------
 --          Suffix Array + LCP -> Suffix tree          --
 ---------------------------------------------------------
 
 construct_stree :: String -> STree
-construct_stree str = suffix_array_to_stree str suffix_array fused_ctree
+construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
 	where
+		str' :: String
+		str' = if (last str) == '$'
+			then str
+			else str ++ "$"
+
 		suffix_array :: SuffixArray
-		suffix_array = test_suffix_array
+		suffix_array = construct_suffix_array str'
 
 		lcps :: A.Array Int Int
 		lcps = get_pairwise_adjacent_lcps str suffix_array
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
-
-{-
-let lcps = get_pairwise_adjacent_lcps str test_suffix_array
-let fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
-let prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree' str test_suffix_array fused_ctree 0
-let prelim_stree = fill_internal_nodes prelim_prelim_stree
-let stree = prelim_stree_to_stree prelim_stree
--}
 
 suffix_array_to_stree :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
 suffix_array_to_stree str suffix_array tree = stree
