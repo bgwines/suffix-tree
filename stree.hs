@@ -146,6 +146,7 @@ let lcps = get_pairwise_adjacent_lcps str test_suffix_array
 let fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
 let prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree' str test_suffix_array fused_ctree 0
 let prelim_stree = fill_internal_nodes prelim_prelim_stree
+let stree = prelim_stree_to_stree prelim_stree
 -}
 
 suffix_array_to_stree :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
@@ -241,7 +242,38 @@ fused_ctree:
 		 PInternal "se" 2
 		 	[PLeaf "$" 6,
 		 	 PLeaf "nse$" 3]]
+
+-- stree: 
+	Internal
+		"$" -> Leaf 8
+
+		"e" -> Internal
+			"$" -> Leaf 7
+			"nse$" -> Leaf 4
+
+		"n" -> Internal
+			"onsense$" -> Leaf 0
+
+		"se" -> Internal
+			"$" -> Leaf 5
+			"nse$" -> Leaf 2
+
+		"onsense$" -> Leaf 1
+
+		"se" -> Internal
+			"$" -> Leaf 6
+			"nse$" -> Leaf 3
 -}
+
+prelim_stree_to_stree :: PreliminarySTree -> STree
+prelim_stree_to_stree (PLeaf s i) = Leaf i
+prelim_stree_to_stree (PInternal s i children) = Internal children_map
+	where
+		children_map :: M.Map String STree
+		children_map = foldr insert M.empty children
+
+		insert :: PreliminarySTree -> M.Map String STree -> M.Map String STree
+		insert child = M.insert (get_string child) (prelim_stree_to_stree child)
 
 fill_internal_nodes :: PreliminarySTree -> PreliminarySTree
 fill_internal_nodes node@(PLeaf _ _) = node
