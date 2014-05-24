@@ -20,7 +20,7 @@ import STree
 
 stree_graph :: Gr Text Text
 stree_graph = mkGraph v e
-  where (v, e) = export_for_graphing . construct_stree $ "nonsense"
+  where (v, e) = export_for_graphing . construct_stree $ "banana"
 
 example_graph :: Gr Text Text
 example_graph = mkGraph [ (1,"one")

@@ -44,22 +44,18 @@ fuse cnode
 			r :: CTree.CTree a
 			r = CTree.right_child cnode
 
-			-- TODO: preserve order, here
 			children :: [FusedCTree a]
-			children = nonmatching_children ++ (concat . map get_children $ matching_children)
+			children = concat . map (child_or_children_of_child . fuse) $ [l, r]
 				where
-					initial_children :: [FusedCTree a]
-					initial_children = [fuse l, fuse r]
-
 					matches :: (FusedCTree a) -> Bool
 					matches Empty = False
 					matches node@(Node e' _) = (e == e')
 
-					matching_children :: [FusedCTree a]
-					matching_children = filter matches initial_children
-
-					nonmatching_children :: [FusedCTree a]
-					nonmatching_children = filter (not . matches) initial_children
+					child_or_children_of_child :: FusedCTree a -> [FusedCTree a]
+					child_or_children_of_child child =
+						if matches child
+							then get_children child
+							else [child]
 
 
 
