@@ -10,20 +10,13 @@ import Data.GraphViz.Types.Monadic
 import Data.Text.Lazy as L
 import Data.Word
 
+import System.IO
+
 import STree
 
-{-
-  How to run:
-    > runhaskell create_dot_file_final.hs > graph.dot
-    > dot -Tpng graph.dot > graph.png
-
-  Thanksto:
-    http://haroldcarr.com/posts/2014-02-28-using-graphviz-via-haskell.html
--}
-
-stree_graph :: Gr Text Text
-stree_graph = mkGraph v e
-  where (v, e) = export_for_graphing . construct_stree $ "banana"
+stree_graph :: String -> Gr Text Text
+stree_graph str = mkGraph v e
+  where (v, e) = export_for_graphing . construct_stree $ str
 
 example_graph :: Gr Text Text
 example_graph = mkGraph [ (1,"one")
@@ -33,9 +26,9 @@ example_graph = mkGraph [ (1,"one")
 
 params :: GraphvizParams n L.Text L.Text () L.Text
 params = nonClusteredParams { globalAttributes = ga
-                                  , fmtNode          = fn
-                                  , fmtEdge          = fe
-                                  }
+                            , fmtNode          = fn
+                            , fmtEdge          = fe
+                            }
   where fn (_,l)   = [textLabel l]
         fe (_,_,l) = [textLabel l]
 
@@ -60,5 +53,11 @@ some_color n | n == 1 = c $ (RGB 127 108 138)
 my_color :: Word8 -> Attribute
 my_color = Color . some_color
 
-main = putStr . unpack . printDotGraph . graphToDot params $ stree_graph
+main :: IO ()
+main = do
+  --putStrLn "Enter a string for which to construct a suffix tree."
+  str <- getLine
+  putStr . unpack . printDotGraph . graphToDot params . stree_graph $ str
+
+
 

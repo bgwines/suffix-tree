@@ -1,83 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE InstanceSigs #-}
 
-{-
-Terms
------
-T$
-	The input string (of length n)
-
-Suffix array
-	an array of the suffixes of T$, stored in sorted order.
-
-Suffix tree
-	Patricia trie of T$ where each leaf is labeled with the index where the corresponding suffix starts in T$.
-
-	// O(n) space, but large constant (15)
-
-	// Usually just an array of start indices of suffixes
-
-Patricia trie (radix trie)
-	 A trie where nodes with only one child are merged with their parents.
-
-LCP
-	Longest common prefix of two strings
-
-RMQ
-	Range-minimum query
-
-Algorithm
----------
-Build a suffix tree in O(n) (all steps are O(n)):
-	1. Build suffix array `S`
-	2. Build LCP array `L` of adjacent elems in `S`
-	3. Build suffix tree from suffix array and LCP array
-
-1. Build suffix array (DC3)
-	(i) Recursively get the sorted order of all suffixes starting at positions that aren't multiples of three.
-		(a) Construct a new string based on suffixes starting at positions in T1 and T2.
-			Begin by computing T$[1:] and T$[2:] and padding each with $ until the lengths are multiples of three, then strcat
-
-			Treat each block of three characters as its own character.
-			
-			Can determine the relative ordering of those characters by an O(m)-time radix sort.
-
-			To keep the alphabet small, replace each block of three characters with its index.
-
-			Recursively compute the suffix array of that string.
-
-
-		(b) Compute the suffix array of that string, recursively.
-
-
-		(c) Use the resulting suffix array to deduce the orderings of the suffixes.
-
-	(ii) Using this information, sort the suffixes at positions that are at multiples of three (call them T0).
-		(a) For each position in T0, form a pair of the letter at that position and the index of the suffix right after it (which is in T1). These pairs are effectively strings drawn from an alphabet of size \Sigma + n.
-
-		(b) Radix sort them. // O(n)
-
-	(iii) Using a standard merge algorithm (à la mergesort), merge the sorted lists of suffixes together into the overall suffix array.
-		// if two compared letters at indices are same, compare letters after them in string (slide 206)
-
-2. Build LCP array `L` of adjacent elems in `S`
-	// http://www.cs.iastate.edu/~cs548/references/linear_lcp.pdf
-
-3. Build suffix tree from suffix array and LCP array
-	(i) Construct a Cartesian tree from the LCP array, fusing together nodes with the same values if one becomes a parent of the other.
-		http://www.stanford.edu/class/cs166/lectures/01/Slides01.pdf
-			#112
-
-	(ii) Run a DFS over the tree and add missing children in the order in which they appear in the suffix array.
-
-	(iii) Assign labels to the edges based on the LCP values.
--}
-
-{-
-Issues:
-	LL, not array => non-linear-time indexing...
--}
-
 module STree
 ( STree(..)
 , construct_stree
@@ -245,53 +168,6 @@ get_prefix_overlap s1 s2 = length . takeWhile eq $ zip s1 s2
 Citation:
 	T. Kasai, G. Lee, H. Arimura, S. Arikawa, K. Park
 	Linear-time longest-common-prefix computation in suffix arrays and its applications
-
-Intuition:
-    `i` represents the starting index of a substring
-
-        => `rank[i]` is the lexicographic order (rank) of suffix starting at `i`
-
-        => each it. of the forloop fills `height` at the index of the next substring
-            e.g.
-                1st it. finds LCP for "nonsense$" and whatever suffix is lexicographically before that
-                2nd it. finds LCP for  "onsense$" and whatever suffix is lexicographically before that
-                3rd it.        ...      "nsense$"     ...
-                ...
-
-    `k` represents the starting index of the suffix we're comparing against. Simply put, `pos[rank[i]]` is just `i`, the index of the current suffix (one of the two in the comparison); to get the other, since we want to compare with an adjacent suffix in the suffix array (`pos`), we get precisely that suffix (it's adjacent in `pos`): pos[rank[i] - 1] (remember that `pos[j]` for any `j` is the starting index of the `j`th lexicographically ordered suffix)
-
-
-    `if h > 0: h -= 1` only makes sense in context of comparing `s[i+h]` to `s[k+h]`. So, why `+h`? OK, this is pretty cool. So basically the idea is that if `h` > 0 then that means that last iteration we compared some suffix `S` with the suffix lexicographically neighbouring it (this implementation uses the one previous to it in `pos`, but you could do the one after it if you wanted) (let it be `T`) and found some overlap. Because of the way the forloop is defined (forwards over `s` / `rank`), the next current suffix (let it be `S'`) is just `S` with the first char lopped off, and, because of the lexicographic ordering of the suffix array (`pos`), the one to which we compare it (`pos[rank[i] - 1]`, `T'`) is just `T` with the first char lopped off, hence, the LCP length between `S'` and `T'` is just the LCP length between `S` and `T` minus one.
-
-    	What's more, that's why this runs in linear time -- even if the string was the same character repeated a whole bunch of times, we'd still be caching the previous iteration's overlap amount in `h`.
-
-        `height`:
-      ====================
-      j^* | height[j]
-      --------------------
-          |    LCP    |
-          | length^** | suffix     (pos)
-      (0) | --------------------------------
-          |           | $           (8)
-        1 |     0   <-|-----------------
-          |           | e$          (7)
-        2 |     1   <-|-----------------
-          |           | ense$       (4)
-        3 |     0   <-|-----------------
-          |           | nonsense$   (0)
-        4 |     1   <-|-----------------
-          |           | nse$        (5)
-        5 |     3   <-|-----------------
-          |           | nsense$     (2)
-        6 |     0   <-|-----------------
-          |           | onsense$    (1)
-        7 |     0   <-|-----------------
-          |           | se$         (6)
-        8 |     2   <-|-----------------
-          |           | sense$      (3)
-
-        	*	in forloop, this will be rank[i]
-            **	(LCP length)[q] corresponds to LCP for suffix[q] and [q+1]
 -}
 get_pairwise_adjacent_lcps :: String -> (A.Array Int Int) -> (A.Array Int Int)
 get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
@@ -376,25 +252,23 @@ flatten leaf@(Leaf _) = [leaf]
 flatten node@(Internal children) =
 	(node) : (concat . map flatten . M.elems $ children)
 
----------------------------------------------------------
---                       Diagrams                      --
----------------------------------------------------------
-
+----------------------------------------
+--Intermediate representation examples--
+----------------------------------------
 {-
+    suffix array:
+                           i
+                          /
+                    _____|
+                    |
+                    v
+          0           1            2           3             4
+        ["$" (8), "e$" (7), "ense$" (4), "nonsense$" (0), "nse$" (5),    
 
-suffix_array:
-                       i
-                      /
-                ______
-                |
-                v
-      0           1            2           3             4        
-	["$" (8), "e$" (7), "ense$" (4), "nonsense$" (0), "nse$" (5),
+              5                   6            7          8
+    		"nsense$" (2), "onsense$" (1), "se$" (6), "sense$" (3)]
 
-          5                   6            7          8
-		"nsense$" (2), "onsense$" (1), "se$" (6), "sense$" (3)]
-
--- fused Cartesian tree:
+	fused Cartesian tree:
                                
                          _____/|\_____
                         /   |  |    | \
@@ -404,7 +278,7 @@ suffix_array:
                             / \
                           [@   @]
 
-	-> suffix tree:
+	(which translates to a suffix tree:
                                _
                          _____/|\______
                         /   |  |    |  \
@@ -415,44 +289,45 @@ suffix_array:
                             /   \
                       [5 (nse$)  5 ($) ]
 
-	(*:"onsense$")
+		(*:"onsense$")
+	)
 
--- preliminary stree, without internal nodes filled:
+	preliminary stree, without internal nodes filled:
 
-	PInternal "" 0
-		[PLeaf "$" 8,
-		 PInternal "" 1
-		 	[PLeaf "e$" 7,
-		 	 PLeaf "ense$" 4],
-		 PInternal "" 1
-		 	[PLeaf "nonsense$" 0,
-		 	 PInternal "" 3
-		 	 	[PLeaf "nse$" 5,
-		 	 	 PLeaf "nsense$" 2]
-		 	],
-		 	PLeaf "onsense$" 1,
-		 	PInternal "" 2
-		 		[PLeaf "se$" 6,
-		 		 PLeaf "sense$" 3]
-		]
+		PInternal "" 0
+			[PLeaf "$" 8,
+			 PInternal "" 1
+			 	[PLeaf "e$" 7,
+			 	 PLeaf "ense$" 4],
+			 PInternal "" 1
+			 	[PLeaf "nonsense$" 0,
+			 	 PInternal "" 3
+			 	 	[PLeaf "nse$" 5,
+			 	 	 PLeaf "nsense$" 2]
+			 	],
+			 	PLeaf "onsense$" 1,
+			 	PInternal "" 2
+			 		[PLeaf "se$" 6,
+			 		 PLeaf "sense$" 3]
+			]
 
--- preliminary stree:
+	preliminary stree, with internal nodes filled:
 
-	PInternal "" 0
-		[PLeaf "$" 8,
-		 
-		 PInternal "e" 1
-		 	[PLeaf "$" 7,
-		 	 PLeaf "nse$" 4],
-		 
-		 PInternal "n" 1
-		 	[PLeaf "onsense$" 0,
-		 	 PInternal "se" 3
-		 	 	[PLeaf "$" 5,PLeaf "nse$" 2]],
+		PInternal "" 0
+			[PLeaf "$" 8,
+			 
+			 PInternal "e" 1
+			 	[PLeaf "$" 7,
+			 	 PLeaf "nse$" 4],
+			 
+			 PInternal "n" 1
+			 	[PLeaf "onsense$" 0,
+			 	 PInternal "se" 3
+			 	 	[PLeaf "$" 5,PLeaf "nse$" 2]],
 
-		 PLeaf "onsense$" 1,
+			 PLeaf "onsense$" 1,
 
-		 PInternal "se" 2
-		 	[PLeaf "$" 6,
-		 	 PLeaf "nse$" 3]]
+			 PInternal "se" 2
+			 	[PLeaf "$" 6,
+			 	 PLeaf "nse$" 3]]
 -}
