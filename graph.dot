@@ -1,0 +1,34 @@
+digraph {
+    graph [rankdir=TB
+          ,bgcolor=white];
+    node [shape=box
+         ,width=0.1
+         ,height=0.1];
+    0 [label=""];
+    1 [label=8];
+    2 [label=""];
+    3 [label=7];
+    4 [label=4];
+    5 [label=""];
+    6 [label=0];
+    7 [label=""];
+    8 [label=5];
+    9 [label=2];
+    10 [label=1];
+    11 [label=""];
+    12 [label=6];
+    13 [label=3];
+    0 -> 11 [label=se];
+    0 -> 5 [label=n];
+    0 -> 2 [label=e];
+    0 -> 10 [label="onsense$"];
+    0 -> 1 [label="$"];
+    2 -> 4 [label="nse$"];
+    2 -> 3 [label="$"];
+    5 -> 7 [label=se];
+    5 -> 6 [label="onsense$"];
+    7 -> 9 [label="nse$"];
+    7 -> 8 [label="$"];
+    11 -> 13 [label="nse$"];
+    11 -> 12 [label="$"];
+}

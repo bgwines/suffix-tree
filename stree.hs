@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 {-
 Terms
@@ -76,19 +77,44 @@ Issues:
 	LL, not array => non-linear-time indexing...
 -}
 
-import qualified Data.Ord as O
+module STree
+( STree(..)
+, construct_stree
+, export_for_graphing
+) where
+
 import qualified Data.Map as M
+import qualified Data.Ord as O
 import qualified Data.List as L
 import qualified Data.Array as A
+import qualified Data.Text.Lazy as Ly
 
 import qualified CTree
 import qualified FusedCTree
+
+import HLib
 
 type SuffixArray = A.Array Int Int
 
 data STree
 	= Leaf Int
 	| Internal (M.Map String STree) deriving Show
+
+-- just for putting into map before Zunctor
+instance Eq STree where
+	a@(Leaf _) == b@(Internal _) = False
+	a@(Internal _) == b@(Leaf _) = False
+	a@(Leaf i) == b@(Leaf i') = i == i'
+	a@(Internal children) == b@(Internal children') = children == children'
+
+-- just for putting into map before Zunctor
+instance Ord STree where
+	a > b = (not (a < b)) && (a /= b)
+	a < b = (size a) < (size b)
+		where
+			size :: STree -> Int
+			size (Leaf i) = 1
+			size (Internal children) = 1 + (sum . map size . M.elems $ children)
 
 data PreliminarySTree
 	= PLeaf String Int
@@ -140,6 +166,66 @@ construct_suffix_array str = A.listArray bounds . map fst . L.sortBy (O.comparin
 ---------------------------------------------------------
 --          Suffix Array + LCP -> Suffix tree          --
 ---------------------------------------------------------
+
+type Graph = ([Node], [Edge])
+type Node = (Int, Ly.Text)
+type Edge = (Int, Int, Ly.Text)
+type Label = Int
+
+export_for_graphing_test :: STree -> Graph
+export_for_graphing_test _ = (v, e)
+	where 
+		v = zip [0..13] $ map Ly.pack ["", "", "1", "", "", "8", "3", "6", "", "0", "4", "7", "2", "5"]
+		e = map (\(a, b, c) -> (a, b, Ly.pack c)) [(0, 1, "se"), (0, 2, "onsense$"), (0, 3, "n"), (0, 4, "e"), (0, 5, "$"), (1, 6, "nse$"), (1, 7, "$"), (3, 8, "se"), (3, 9, "onsense$"), (4, 10, "nse$"), (4, 11, "$"), (8, 12, "nse$"), (8, 13, "$")]
+
+export_for_graphing :: STree -> Graph
+export_for_graphing stree = (nodes, edges)
+	where
+		flattened_tree :: [STree]
+		flattened_tree = flatten stree
+
+		labelling :: [(Int, STree)]
+		labelling = zip [0..] flattened_tree
+
+		get_label :: STree -> Int
+		get_label node = fst . find_guaranteed matches $ labelling
+			where
+				matches :: (Int, STree) -> Bool
+				matches (_, node') = (node == node')
+
+		nodes :: [Node]
+		nodes = map nodeify labelling
+			where
+				nodeify :: (Int, STree) -> Node
+				nodeify (i, (Leaf i')) = (i, (Ly.pack . show $ i'))
+				nodeify (i, (Internal _)) = (i, (Ly.pack ""))
+
+		edges :: [Edge]
+		edges = concat . map edgeify $ flattened_tree
+			where
+				edgeify :: STree -> [(Int, Int, Ly.Text)]
+				edgeify tree@(Leaf _) = []
+				edgeify tree@(Internal children) = map edgeify_child $ M.keys children
+					where
+						edgeify_child :: String -> (Int, Int, Ly.Text)
+						edgeify_child edge_label = (i, i', edge_label')
+							where
+								i :: Int
+								i = get_label tree
+
+								child :: STree
+								child = from_just $ M.lookup edge_label children
+
+								i' :: Int
+								i' = get_label child 
+								
+								edge_label' :: Ly.Text
+								edge_label' = Ly.pack edge_label
+
+flatten :: STree -> [STree]
+flatten leaf@(Leaf _) = [leaf]
+flatten node@(Internal children) =
+	(node) : (concat . map flatten . M.elems $ children)
 
 construct_stree :: String -> STree
 construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
@@ -213,6 +299,29 @@ fused_ctree:
 
 	*:"onsense$"
 
+
+	Internal
+		"$" -> 8
+
+		"e" ->
+			"$" -> 7
+			"nse$" -> 4
+
+		"n" ->
+			"onsense$" -> 0
+
+		"se" ->
+			"$" -> 5
+			"nse$" -> 2
+
+		"onsense$" -> 1
+
+		"se" ->
+			"$" -> 6
+			"nse$" -> 3
+
+
+
 -- preliminary stree, without internal nodes filled:
 
 	PInternal "" 0
@@ -268,10 +377,6 @@ fused_ctree:
 			"nse$" -> Leaf 2
 
 		"onsense$" -> Leaf 1
-
-		"se" -> Internal
-			"$" -> Leaf 6
-			"nse$" -> Leaf 3
 -}
 
 prelim_stree_to_stree :: PreliminarySTree -> STree
@@ -322,28 +427,6 @@ fctree_to_prelim_prelim_stree' str suffix_array fused_ctree i =
 
 				children :: [PreliminarySTree]
 				children = map fst children_with_updated_is
-
-
-
-
-{-			children :: M.Map String STree
-			children = foldl insert M.empty . map fst $children_with_updated_is
-				where
-					insert :: M.Map String STree -> STree -> M.Map String STree
-					insert m node = M.insert s node m
-						where
-							s :: String
-							s = if is_leaf node
-								-- ! not O(1)
-								then take n . reverse $ str 
-								else
-									-- don't work; keys are unique. It'll overwrite...
-									"" -- for now; we'll do a second pass later that fixes this
-
-							n :: Int
-							n = (length str) - (index node)-}
-
-
 
 ---------------------------------------------------------
 --                    Pair-wise LCP                    --
