@@ -38,14 +38,8 @@ fuse cnode
 			e :: a
 			e = CTree.value cnode
 
-			l :: CTree.CTree a
-			l = CTree.left_child cnode
-			
-			r :: CTree.CTree a
-			r = CTree.right_child cnode
-
 			children :: [FusedCTree a]
-			children = concat . map (child_or_children_of_child . fuse) $ [l, r]
+			children = concat . map (child_or_children_of_child . fuse . ($ cnode)) $ [CTree.left_child, CTree.right_child]
 				where
 					matches :: (FusedCTree a) -> Bool
 					matches Empty = False

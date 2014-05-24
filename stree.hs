@@ -94,27 +94,21 @@ import qualified FusedCTree
 
 import HLib
 
+----------------------------------------------------------
+--                 Algebraic Data Types                 --
+----------------------------------------------------------
+
 type SuffixArray = A.Array Int Int
 
 data STree
 	= Leaf Int
 	| Internal (M.Map String STree) deriving Show
 
--- just for putting into map before Zunctor
 instance Eq STree where
 	a@(Leaf _) == b@(Internal _) = False
 	a@(Internal _) == b@(Leaf _) = False
 	a@(Leaf i) == b@(Leaf i') = i == i'
 	a@(Internal children) == b@(Internal children') = children == children'
-
--- just for putting into map before Zunctor
-instance Ord STree where
-	a > b = (not (a < b)) && (a /= b)
-	a < b = (size a) < (size b)
-		where
-			size :: STree -> Int
-			size (Leaf i) = 1
-			size (Internal children) = 1 + (sum . map size . M.elems $ children)
 
 data PreliminarySTree
 	= PLeaf String Int
@@ -136,23 +130,6 @@ is_leaf :: STree -> Bool
 is_leaf (Leaf _) = True
 is_leaf (Internal _) = False
 
--- 1. Build suffix array `S`
--- 2. Build LCP array `L` of adjacent elems in `S`
--- 3. Build suffix tree from suffix array and LCP array
-
----------------------------------------------------------
---                   Test Structures                   --
----------------------------------------------------------
-
-str :: String
-str = "nonsense$"
-
-test_suffix_array :: SuffixArray
-test_suffix_array = A.array (0,8) [(0,8),(1,7),(2,4),(3,0),(4,5),(5,2),(6,1),(7,6),(8,3)]
-
-test_suffix_lcp_array :: [Int]
-test_suffix_lcp_array = A.elems . get_pairwise_adjacent_lcps str $test_suffix_array
-
 ----------------------------------------------------------
 --                     Suffix Array                     --
 ----------------------------------------------------------
@@ -164,68 +141,8 @@ construct_suffix_array str = A.listArray bounds . map fst . L.sortBy (O.comparin
 		bounds = (0, (length str) - 1)
 
 ---------------------------------------------------------
---          Suffix Array + LCP -> Suffix tree          --
+--                     Suffix tree                     --
 ---------------------------------------------------------
-
-type Graph = ([Node], [Edge])
-type Node = (Int, Ly.Text)
-type Edge = (Int, Int, Ly.Text)
-type Label = Int
-
-export_for_graphing_test :: STree -> Graph
-export_for_graphing_test _ = (v, e)
-	where 
-		v = zip [0..13] $ map Ly.pack ["", "", "1", "", "", "8", "3", "6", "", "0", "4", "7", "2", "5"]
-		e = map (\(a, b, c) -> (a, b, Ly.pack c)) [(0, 1, "se"), (0, 2, "onsense$"), (0, 3, "n"), (0, 4, "e"), (0, 5, "$"), (1, 6, "nse$"), (1, 7, "$"), (3, 8, "se"), (3, 9, "onsense$"), (4, 10, "nse$"), (4, 11, "$"), (8, 12, "nse$"), (8, 13, "$")]
-
-export_for_graphing :: STree -> Graph
-export_for_graphing stree = (nodes, edges)
-	where
-		flattened_tree :: [STree]
-		flattened_tree = flatten stree
-
-		labelling :: [(Int, STree)]
-		labelling = zip [0..] flattened_tree
-
-		get_label :: STree -> Int
-		get_label node = fst . find_guaranteed matches $ labelling
-			where
-				matches :: (Int, STree) -> Bool
-				matches (_, node') = (node == node')
-
-		nodes :: [Node]
-		nodes = map nodeify labelling
-			where
-				nodeify :: (Int, STree) -> Node
-				nodeify (i, (Leaf i')) = (i, (Ly.pack . show $ i'))
-				nodeify (i, (Internal _)) = (i, (Ly.pack ""))
-
-		edges :: [Edge]
-		edges = concat . map edgeify $ flattened_tree
-			where
-				edgeify :: STree -> [(Int, Int, Ly.Text)]
-				edgeify tree@(Leaf _) = []
-				edgeify tree@(Internal children) = map edgeify_child $ M.keys children
-					where
-						edgeify_child :: String -> (Int, Int, Ly.Text)
-						edgeify_child edge_label = (i, i', edge_label')
-							where
-								i :: Int
-								i = get_label tree
-
-								child :: STree
-								child = from_just $ M.lookup edge_label children
-
-								i' :: Int
-								i' = get_label child 
-								
-								edge_label' :: Ly.Text
-								edge_label' = Ly.pack edge_label
-
-flatten :: STree -> [STree]
-flatten leaf@(Leaf _) = [leaf]
-flatten node@(Internal children) =
-	(node) : (concat . map flatten . M.elems $ children)
 
 construct_stree :: String -> STree
 construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
@@ -255,129 +172,6 @@ suffix_array_to_stree str suffix_array tree = stree
 
 		stree :: STree
 		stree = prelim_stree_to_stree prelim_stree
-
-{-
-data STree
-	= Leaf Int
-	| Internal (M.Map String STree)
-
-
-suffix_array:
-                       i
-                      /
-                ______
-                |
-                v
-      0           1            2           3             4        
-	["$" (8), "e$" (7), "ense$" (4), "nonsense$" (0), "nse$" (5),
-
-          5                   6            7          8
-		"nsense$" (2), "onsense$" (1), "se$" (6), "sense$" (3)]
-
-fused_ctree:
-                               
-                         _____/|\_____
-                        /   |  |    | \
-                      [2    @  1    1  @]
-                      /|      /|    |\
-                    [@ @]   [3 @]  [@ @]
-                            / \
-                          [@   @]
-
-
-->
-
-                               _
-                         _____/|\______
-                        /   |  |    |  \
-                     [ se 1(*) n    e   8 ($) ]
-                ______/|      / \    \___________________
-                |      /   [ se  0 (*) ]     |           |
-          [3 (nse$)  6 ($) ] / \          [ 4 (nse$)   7 ($) ]
-                            /   \
-                      [5 (nse$)  5 ($) ]
-
-	*:"onsense$"
-
-
-	Internal
-		"$" -> 8
-
-		"e" ->
-			"$" -> 7
-			"nse$" -> 4
-
-		"n" ->
-			"onsense$" -> 0
-
-		"se" ->
-			"$" -> 5
-			"nse$" -> 2
-
-		"onsense$" -> 1
-
-		"se" ->
-			"$" -> 6
-			"nse$" -> 3
-
-
-
--- preliminary stree, without internal nodes filled:
-
-	PInternal "" 0
-		[PLeaf "$" 8,
-		 PInternal "" 1
-		 	[PLeaf "e$" 7,
-		 	 PLeaf "ense$" 4],
-		 PInternal "" 1
-		 	[PLeaf "nonsense$" 0,
-		 	 PInternal "" 3
-		 	 	[PLeaf "nse$" 5,
-		 	 	 PLeaf "nsense$" 2]
-		 	],
-		 	PLeaf "onsense$" 1,
-		 	PInternal "" 2
-		 		[PLeaf "se$" 6,
-		 		 PLeaf "sense$" 3]
-		]
-
--- preliminary stree:
-
-	PInternal "" 0
-		[PLeaf "$" 8,
-		 
-		 PInternal "e" 1
-		 	[PLeaf "$" 7,
-		 	 PLeaf "nse$" 4],
-		 
-		 PInternal "n" 1
-		 	[PLeaf "onsense$" 0,
-		 	 PInternal "se" 3
-		 	 	[PLeaf "$" 5,PLeaf "nse$" 2]],
-
-		 PLeaf "onsense$" 1,
-
-		 PInternal "se" 2
-		 	[PLeaf "$" 6,
-		 	 PLeaf "nse$" 3]]
-
--- stree: 
-	Internal
-		"$" -> Leaf 8
-
-		"e" -> Internal
-			"$" -> Leaf 7
-			"nse$" -> Leaf 4
-
-		"n" -> Internal
-			"onsense$" -> Leaf 0
-
-		"se" -> Internal
-			"$" -> Leaf 5
-			"nse$" -> Leaf 2
-
-		"onsense$" -> Leaf 1
--}
 
 prelim_stree_to_stree :: PreliminarySTree -> STree
 prelim_stree_to_stree (PLeaf s i) = Leaf i
@@ -474,6 +268,141 @@ get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
 					height' = height A.// [((rank A.! i) - 1, h'')] -- -1 for 0-indexing
 					h' = if h'' > 0 then h'' - 1 else h''
 
+---------------------------------------------------------
+--                       Graphing                      --
+---------------------------------------------------------
 
+type Graph = ([Node], [Edge])
+type Node = (Int, Ly.Text)
+type Edge = (Int, Int, Ly.Text)
+type Label = Int
 
+export_for_graphing :: STree -> Graph
+export_for_graphing stree = (nodes, edges)
+	where
+		flattened_tree :: [STree]
+		flattened_tree = flatten stree
 
+		labelling :: [(Int, STree)]
+		labelling = zip [0..] flattened_tree
+
+		get_label :: STree -> Int
+		get_label node = fst . find_guaranteed matches $ labelling
+			where
+				matches :: (Int, STree) -> Bool
+				matches (_, node') = (node == node')
+
+		nodes :: [Node]
+		nodes = map nodeify labelling
+			where
+				nodeify :: (Int, STree) -> Node
+				nodeify (i, (Leaf i')) = (i, (Ly.pack . show $ i'))
+				nodeify (i, (Internal _)) = (i, (Ly.pack ""))
+
+		edges :: [Edge]
+		edges = concat . map edgeify $ flattened_tree
+			where
+				edgeify :: STree -> [(Int, Int, Ly.Text)]
+				edgeify tree@(Leaf _) = []
+				edgeify tree@(Internal children) = map edgeify_child $ M.keys children
+					where
+						edgeify_child :: String -> (Int, Int, Ly.Text)
+						edgeify_child edge_label = (i, i', edge_label')
+							where
+								i :: Int
+								i = get_label tree
+
+								child :: STree
+								child = from_just $ M.lookup edge_label children
+
+								i' :: Int
+								i' = get_label child 
+								
+								edge_label' :: Ly.Text
+								edge_label' = Ly.pack edge_label
+
+flatten :: STree -> [STree]
+flatten leaf@(Leaf _) = [leaf]
+flatten node@(Internal children) =
+	(node) : (concat . map flatten . M.elems $ children)
+
+---------------------------------------------------------
+--                       Diagrams                      --
+---------------------------------------------------------
+
+{-
+
+suffix_array:
+                       i
+                      /
+                ______
+                |
+                v
+      0           1            2           3             4        
+	["$" (8), "e$" (7), "ense$" (4), "nonsense$" (0), "nse$" (5),
+
+          5                   6            7          8
+		"nsense$" (2), "onsense$" (1), "se$" (6), "sense$" (3)]
+
+-- fused Cartesian tree:
+                               
+                         _____/|\_____
+                        /   |  |    | \
+                      [2    @  1    1  @]
+                      /|      /|    |\
+                    [@ @]   [3 @]  [@ @]
+                            / \
+                          [@   @]
+
+	-> suffix tree:
+                               _
+                         _____/|\______
+                        /   |  |    |  \
+                     [ se 1(*) n    e   8 ($) ]
+                ______/|      / \    \___________________
+                |      /   [ se  0 (*) ]     |           |
+          [3 (nse$)  6 ($) ] / \          [ 4 (nse$)   7 ($) ]
+                            /   \
+                      [5 (nse$)  5 ($) ]
+
+	(*:"onsense$")
+
+-- preliminary stree, without internal nodes filled:
+
+	PInternal "" 0
+		[PLeaf "$" 8,
+		 PInternal "" 1
+		 	[PLeaf "e$" 7,
+		 	 PLeaf "ense$" 4],
+		 PInternal "" 1
+		 	[PLeaf "nonsense$" 0,
+		 	 PInternal "" 3
+		 	 	[PLeaf "nse$" 5,
+		 	 	 PLeaf "nsense$" 2]
+		 	],
+		 	PLeaf "onsense$" 1,
+		 	PInternal "" 2
+		 		[PLeaf "se$" 6,
+		 		 PLeaf "sense$" 3]
+		]
+
+-- preliminary stree:
+
+	PInternal "" 0
+		[PLeaf "$" 8,
+		 
+		 PInternal "e" 1
+		 	[PLeaf "$" 7,
+		 	 PLeaf "nse$" 4],
+		 
+		 PInternal "n" 1
+		 	[PLeaf "onsense$" 0,
+		 	 PInternal "se" 3
+		 	 	[PLeaf "$" 5,PLeaf "nse$" 2]],
+
+		 PLeaf "onsense$" 1,
+
+		 PInternal "se" 2
+		 	[PLeaf "$" 6,
+		 	 PLeaf "nse$" 3]]
+-}

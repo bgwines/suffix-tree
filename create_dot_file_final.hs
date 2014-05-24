@@ -7,7 +7,7 @@ import Data.GraphViz
 import Data.GraphViz.Attributes.Complete
 import Data.GraphViz.Types.Generalised as G
 import Data.GraphViz.Types.Monadic
-import Data.Text.Lazy  as L
+import Data.Text.Lazy as L
 import Data.Word
 
 import STree
@@ -16,6 +16,9 @@ import STree
   How to run:
     > runhaskell create_dot_file_final.hs > graph.dot
     > dot -Tpng graph.dot > graph.png
+
+  Thanksto:
+    http://haroldcarr.com/posts/2014-02-28-using-graphviz-via-haskell.html
 -}
 
 stree_graph :: Gr Text Text
