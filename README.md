@@ -26,7 +26,7 @@ Known issues
 
 - Suffix array construction isn't DC3, so it's `O(n^2 log n)` instead of `O(n)`
 
-- Uses `String` instead of `Data.ByteString` or something similar, so some operations (e.g. substring-getting) needed by LCP construction aren't `O(1)`, so that doesn't run in `O(n)` either.
+- Uses `String` instead of `Data.ByteString` or something similar, so some operations aren't `O(1)` like they need to be.
 
 - Currently lacking functions on the tree itself (e.g. querying)
 
@@ -84,6 +84,10 @@ Algorithm
 	- if two compared letters at indices are same, compare letters after them in string (slide 206)
 
 ####Step 2. Build LCP array `L` of adjacent elems in `S`
+
+- `pos[i]`: "what's the `i`^th lexicographically ordered suffix (== what _position_ does it start at?)?"
+
+- `rank[i]`: "what's the lexicographic order (_rank_) of the suffix starting at `i`?"
 
 - `i` represents the starting index of a substring
 
