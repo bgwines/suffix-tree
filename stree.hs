@@ -12,6 +12,7 @@ import qualified Data.Ord as O
 import qualified Data.List as L
 import qualified Data.Array as A
 import qualified Data.Text.Lazy as Ly
+import qualified Data.ByteString.Char8 as S
 
 import Data.Monoid
 
@@ -82,7 +83,7 @@ construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
 		suffix_array = construct_suffix_array str'
 
 		lcps :: A.Array Int Int
-		lcps = get_pairwise_adjacent_lcps str suffix_array
+		lcps = get_pairwise_adjacent_lcps (S.pack str) suffix_array
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
@@ -158,18 +159,34 @@ alength = snd . A.bounds
 invert :: (A.Array Int Int) -> (A.Array Int Int)
 invert arr = A.array (0, alength arr) $ zip (A.elems arr) (A.indices arr)
 
-get_prefix_overlap :: String -> String -> Int
-get_prefix_overlap s1 s2 = length . takeWhile eq $ zip s1 s2
-	where
-		eq :: (Eq a) => (a, a) -> Bool
-		eq (a, b) = a == b
+lcp :: S.ByteString -> S.ByteString -> Int
+lcp s1 s2
+	| is_empty s1 = 0
+	| is_empty s2 = 0
+	| otherwise = if ch1 == ch2
+		then 1 + (lcp s1' s2')
+		else 0
+		where
+			ch1 :: Char
+			ch1 = S.index s1 0
 
+			ch2 :: Char
+			ch2 = S.index s2 0
+
+			s1' :: S.ByteString
+			s1' = S.drop 1 s1
+
+			s2' :: S.ByteString
+			s2' = S.drop 1 s2
+
+			is_empty :: S.ByteString -> Bool
+			is_empty s = (S.length s) == 0			
 {-
 Citation:
 	T. Kasai, G. Lee, H. Arimura, S. Arikawa, K. Park
 	Linear-time longest-common-prefix computation in suffix arrays and its applications
 -}
-get_pairwise_adjacent_lcps :: String -> (A.Array Int Int) -> (A.Array Int Int)
+get_pairwise_adjacent_lcps :: S.ByteString -> (A.Array Int Int) -> (A.Array Int Int)
 get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
 	where
 		rank :: A.Array Int Int
@@ -186,8 +203,7 @@ get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
 			| (i == (alength rank) - 1) = height  -- -1 to skip "$"
 			| otherwise = get_height' (i+1) h' height'
 				where
-					-- drop not O(1)?
-					h'' = get_prefix_overlap (drop i str) (drop k str)
+					h'' = lcp (S.drop i str) (S.drop k str)
 						where
 							k = pos A.! ((rank A.! i) - 1)
 							
