@@ -81,9 +81,12 @@ pad str = if (last str) == '$'
 --                     Suffix Array                     --
 ----------------------------------------------------------
 
-construct_suffix_array :: String -> SuffixArray
-construct_suffix_array str = A.listArray bounds . map fst . L.sortBy (O.comparing snd) . zip [0..] . init . L.tails $ str
+construct_suffix_array :: S.ByteString -> SuffixArray
+construct_suffix_array str' = A.listArray bounds . map fst . L.sortBy (O.comparing snd) . zip [0..] . init . L.tails $ str
 	where
+		str :: String
+		str = S.unpack str'
+
 		bounds :: (Int, Int)
 		bounds = (0, (length str) - 1)
 
@@ -94,29 +97,29 @@ construct_suffix_array str = A.listArray bounds . map fst . L.sortBy (O.comparin
 construct_stree :: String -> STree
 construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
 	where
-		str' :: String
-		str' = pad str
+		str' :: S.ByteString
+		str' = S.pack . pad $ str
 
 		suffix_array :: SuffixArray
 		suffix_array = construct_suffix_array str'
 
 		lcps :: A.Array Int Int
-		lcps = get_pairwise_adjacent_lcps (S.pack str') suffix_array
+		lcps = get_pairwise_adjacent_lcps str' suffix_array
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
 
-suffix_array_to_stree :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
+suffix_array_to_stree :: S.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
 suffix_array_to_stree str suffix_array tree = stree
 	where
 		prelim_prelim_stree :: PreliminaryPreliminarySTree
-		prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree' str suffix_array tree 0	
+		prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree suffix_array tree 0	
 
 		prelim_stree :: PreliminarySTree
-		prelim_stree = fill_internal_nodes (length str) prelim_prelim_stree
+		prelim_stree = fill_internal_nodes (S.length str) prelim_prelim_stree
 
 		stree :: STree
-		stree = prelim_stree_to_stree prelim_stree (S.pack str)
+		stree = prelim_stree_to_stree prelim_stree str
 
 prelim_stree_to_stree :: PreliminarySTree -> S.ByteString -> STree
 prelim_stree_to_stree (PLeaf s i) _ = Leaf i
@@ -158,8 +161,8 @@ fill_internal_nodes strlen node@(PPInternal i children) =
 		substr = substr_take i . get_substr . head $ filled_children
 
 -- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
-fctree_to_prelim_prelim_stree' :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
-fctree_to_prelim_prelim_stree' str suffix_array fused_ctree i =
+fctree_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
+fctree_to_prelim_prelim_stree suffix_array fused_ctree i =
 	if (FusedCTree.is_empty fused_ctree)
 		then (PPLeaf (suffix_array A.! i), i+1)
 		else (PPInternal lcp children, i')
@@ -171,7 +174,7 @@ fctree_to_prelim_prelim_stree' str suffix_array fused_ctree i =
 				children_with_updated_is = tail $ scanl f (undefined, i) $ FusedCTree.get_children fused_ctree
 					where
 						f :: (PreliminaryPreliminarySTree, Int) -> FusedCTree.FusedCTree Int -> (PreliminaryPreliminarySTree, Int)
-						f (_, i'') child = fctree_to_prelim_prelim_stree' str suffix_array child i''
+						f (_, i'') child = fctree_to_prelim_prelim_stree suffix_array child i''
 
 				i' :: Int
 				i' = snd . last $ children_with_updated_is

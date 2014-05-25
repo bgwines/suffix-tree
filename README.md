@@ -24,8 +24,6 @@ Known issues
 
 - Suffix array construction isn't DC3, so it's `O(n^2 log n)` instead of `O(n)`
 
-- Uses `String`s in some places instead of `Data.ByteString`s or something similar, so some operations aren't `O(1)` like they need to be.
-
 - Currently lacking functions on the tree itself (e.g. querying)
 
 Algorithm
@@ -34,11 +32,11 @@ Algorithm
 ###Terms
 - `T$`: The input string (of length n)
 
-- Suffix array: an array of the suffixes of T$, stored in sorted order.
+- Suffix array: an array of the suffixes of `T$`, stored in sorted order.
 
 - Suffix tree: A Patricia trie of `T$` where each leaf is labeled with the index where the corresponding suffix starts in `T$`.
 
-	- `O(n)` space, but large constant (15)
+	- `O(n)` space, but large constant (`15`)
 
 	- Usually just an array of start indices of suffixes
 
