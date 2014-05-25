@@ -22,15 +22,11 @@ Dependencies
 Known issues
 ------------
 
-- Doesn't seem to be happy with the input string `"pizzazzpizza"`
-
 - Suffix array construction isn't DC3, so it's `O(n^2 log n)` instead of `O(n)`
 
-- Uses `String` instead of `Data.ByteString` or something similar, so some operations aren't `O(1)` like they need to be.
+- Uses `String`s in some places instead of `Data.ByteString`s or something similar, so some operations aren't `O(1)` like they need to be.
 
 - Currently lacking functions on the tree itself (e.g. querying)
-
-- Internal nodes store strings instead of `(start, end)` pairs, so space usage is actually `O(n^2)`.
 
 Algorithm
 ---------

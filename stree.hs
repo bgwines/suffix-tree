@@ -27,9 +27,27 @@ import HLib
 
 type SuffixArray = A.Array Int Int
 
+{-
+	Internal nodes may have any number of children (alphabet permitting), but none will share the same first character (otherwise they would share a parent, which would be a child of this node. Thus, for querying purposes, we represent an internal node as a map from first characters to (substring, child) pairs.
+-}
+type Childrenmap = M.Map Char (Substring, STree)
+type Substring = (Int, Int)
+
 data STree
 	= Leaf Int
-	| Internal (M.Map String STree) deriving Show
+	| Internal Childrenmap deriving Show
+
+data PreliminarySTree
+	= PLeaf Substring Int
+	| PInternal Substring [PreliminarySTree] deriving Show
+
+data PreliminaryPreliminarySTree
+	= PPLeaf Int
+	| PPInternal Int [PreliminaryPreliminarySTree] deriving Show
+
+----------------------------------------------------------
+--                Instance Declarations                 --
+----------------------------------------------------------
 
 instance Eq STree where
 	a@(Leaf _) == b@(Internal _) = False
@@ -37,25 +55,27 @@ instance Eq STree where
 	a@(Leaf i) == b@(Leaf i') = i == i'
 	a@(Internal children) == b@(Internal children') = children == children'
 
-data PreliminarySTree
-	= PLeaf String Int
-	| PInternal String Int [PreliminarySTree] deriving Show
+----------------------------------------------------------
+--                   Utility Functions                  --
+----------------------------------------------------------
 
-update_string :: (String -> String) -> PreliminarySTree -> PreliminarySTree
-update_string f node@(PLeaf s i) = PLeaf (f s) i
-update_string f node@(PInternal s i children) = PInternal (f s) i children
+substring :: Substring -> S.ByteString -> S.ByteString
+substring (i, len) = S.take len . S.drop i
 
-get_string :: PreliminarySTree -> String
-get_string node@(PLeaf s _) = s
-get_string node@(PInternal s _ _) = s
+substr_drop :: Int -> Substring -> Substring
+substr_drop d (i, len) = (i + d, len - d)
 
-index :: STree -> Int
-index (Leaf i) = i
-index (Internal _) = error "Internal nodes don't represent ends of suffixes"
+substr_take :: Int -> Substring -> Substring
+substr_take t (i, len) = (i, t)
 
-is_leaf :: STree -> Bool
-is_leaf (Leaf _) = True
-is_leaf (Internal _) = False
+get_substr :: PreliminarySTree -> Substring
+get_substr (PLeaf substr _) = substr
+get_substr (PInternal substr _) = substr
+
+pad :: String -> String
+pad str = if (last str) == '$'
+	then str
+	else str ++ "$"
 
 ----------------------------------------------------------
 --                     Suffix Array                     --
@@ -75,15 +95,13 @@ construct_stree :: String -> STree
 construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
 	where
 		str' :: String
-		str' = if (last str) == '$'
-			then str
-			else str ++ "$"
+		str' = pad str
 
 		suffix_array :: SuffixArray
 		suffix_array = construct_suffix_array str'
 
 		lcps :: A.Array Int Int
-		lcps = get_pairwise_adjacent_lcps (S.pack str) suffix_array
+		lcps = get_pairwise_adjacent_lcps (S.pack str') suffix_array
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
@@ -91,62 +109,74 @@ construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
 suffix_array_to_stree :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
 suffix_array_to_stree str suffix_array tree = stree
 	where
-		prelim_prelim_stree :: PreliminarySTree
+		prelim_prelim_stree :: PreliminaryPreliminarySTree
 		prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree' str suffix_array tree 0	
 
 		prelim_stree :: PreliminarySTree
-		prelim_stree = fill_internal_nodes prelim_prelim_stree
+		prelim_stree = fill_internal_nodes (length str) prelim_prelim_stree
 
 		stree :: STree
-		stree = prelim_stree_to_stree prelim_stree
+		stree = prelim_stree_to_stree prelim_stree (S.pack str)
 
-prelim_stree_to_stree :: PreliminarySTree -> STree
-prelim_stree_to_stree (PLeaf s i) = Leaf i
-prelim_stree_to_stree (PInternal s i children) = Internal children_map
+prelim_stree_to_stree :: PreliminarySTree -> S.ByteString -> STree
+prelim_stree_to_stree (PLeaf s i) _ = Leaf i
+prelim_stree_to_stree (PInternal s children) str = Internal children_map
 	where
-		children_map :: M.Map String STree
+		children_map :: Childrenmap
 		children_map = foldr insert M.empty children
 
-		insert :: PreliminarySTree -> M.Map String STree -> M.Map String STree
-		insert child = M.insert (get_string child) (prelim_stree_to_stree child)
+		insert :: PreliminarySTree -> Childrenmap -> Childrenmap
+		insert child = M.insert edge_label (substr, child')
+			where
+				substr :: Substring
+				substr = get_substr child
 
-fill_internal_nodes :: PreliminarySTree -> PreliminarySTree
-fill_internal_nodes node@(PLeaf _ _) = node
-fill_internal_nodes node@(PInternal s i children) = PInternal s' i corrected_children
+				edge_label :: Char
+				edge_label = S.index str (fst substr)
+
+				child' :: STree
+				child' = prelim_stree_to_stree child str
+
+fill_internal_nodes :: Int -> PreliminaryPreliminarySTree -> PreliminarySTree
+fill_internal_nodes strlen node@(PPLeaf i) = PLeaf (i, strlen - i) i
+fill_internal_nodes strlen node@(PPInternal i children) =
+	PInternal substr corrected_children
 	where
 		filled_children :: [PreliminarySTree]
-		filled_children = map fill_internal_nodes children
+		filled_children = map (fill_internal_nodes strlen) children
 
 		corrected_children :: [PreliminarySTree]
-		corrected_children = map f filled_children
+		corrected_children = map correct_child filled_children
 
-		f :: PreliminarySTree -> PreliminarySTree
-		f node = update_string (drop i) node -- not O(1)!
+		correct_child :: PreliminarySTree -> PreliminarySTree
+		correct_child child@(PLeaf child_substr starting_index) =
+			PLeaf (substr_drop i child_substr) starting_index
+		correct_child child@(PInternal child_substr children) =
+			PInternal (substr_drop i child_substr) children
 
-		s' :: String
-		s' = take i . get_string . head $ children
+		substr :: Substring
+		substr = substr_take i . get_substr . head $ filled_children
 
-fctree_to_prelim_prelim_stree' :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminarySTree, Int)
+-- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
+fctree_to_prelim_prelim_stree' :: String -> SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
 fctree_to_prelim_prelim_stree' str suffix_array fused_ctree i =
 	if (FusedCTree.is_empty fused_ctree)
-		then
-			let index = suffix_array A.! i
-			in (PLeaf (drop index str) (index), i+1) -- not O(1)!
-		else (PInternal "" lcp children, i') -- "" for now; this is preliminary-preliminary
+		then (PPLeaf (suffix_array A.! i), i+1)
+		else (PPInternal lcp children, i')
 			where
 				lcp :: Int
 				lcp = FusedCTree.value fused_ctree
 
-				children_with_updated_is :: [(PreliminarySTree, Int)]
+				children_with_updated_is :: [(PreliminaryPreliminarySTree, Int)]
 				children_with_updated_is = tail $ scanl f (undefined, i) $ FusedCTree.get_children fused_ctree
 					where
-						f :: (PreliminarySTree, Int) -> FusedCTree.FusedCTree Int -> (PreliminarySTree, Int)
+						f :: (PreliminaryPreliminarySTree, Int) -> FusedCTree.FusedCTree Int -> (PreliminaryPreliminarySTree, Int)
 						f (_, i'') child = fctree_to_prelim_prelim_stree' str suffix_array child i''
 
 				i' :: Int
 				i' = snd . last $ children_with_updated_is
 
-				children :: [PreliminarySTree]
+				children :: [PreliminaryPreliminarySTree]
 				children = map fst children_with_updated_is
 
 ---------------------------------------------------------
@@ -181,11 +211,7 @@ lcp s1 s2
 
 			is_empty :: S.ByteString -> Bool
 			is_empty s = (S.length s) == 0			
-{-
-Citation:
-	T. Kasai, G. Lee, H. Arimura, S. Arikawa, K. Park
-	Linear-time longest-common-prefix computation in suffix arrays and its applications
--}
+
 get_pairwise_adjacent_lcps :: S.ByteString -> (A.Array Int Int) -> (A.Array Int Int)
 get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
 	where
@@ -219,9 +245,12 @@ type Node = (Int, Ly.Text)
 type Edge = (Int, Int, Ly.Text)
 type Label = Int
 
-export_for_graphing :: STree -> Graph
-export_for_graphing stree = (nodes, edges)
+export_for_graphing :: String -> STree -> Graph
+export_for_graphing str' stree = (nodes, edges)
 	where
+		str :: S.ByteString
+		str = S.pack . pad $ str'
+
 		flattened_tree :: [STree]
 		flattened_tree = flatten stree
 
@@ -246,104 +275,21 @@ export_for_graphing stree = (nodes, edges)
 			where
 				edgeify :: STree -> [(Int, Int, Ly.Text)]
 				edgeify tree@(Leaf _) = []
-				edgeify tree@(Internal children) = map edgeify_child $ M.keys children
+				edgeify tree@(Internal children) = map edgeify_child $ M.elems children
 					where
-						edgeify_child :: String -> (Int, Int, Ly.Text)
-						edgeify_child edge_label = (i, i', edge_label')
+						edgeify_child :: (Substring, STree) -> (Int, Int, Ly.Text)
+						edgeify_child childpair = (parent_label, child_label, edge_label')
 							where
-								i :: Int
-								i = get_label tree
+								parent_label :: Int
+								parent_label = get_label tree
 
-								child :: STree
-								child = from_just $ M.lookup edge_label children
-
-								i' :: Int
-								i' = get_label child 
+								child_label :: Int
+								child_label = get_label . snd $ childpair
 								
 								edge_label' :: Ly.Text
-								edge_label' = Ly.pack edge_label
+								edge_label' = Ly.pack . S.unpack $ substring (fst childpair) str
 
 flatten :: STree -> [STree]
 flatten leaf@(Leaf _) = [leaf]
 flatten node@(Internal children) =
-	(node) : (concat . map flatten . M.elems $ children)
-
-----------------------------------------
---Intermediate representation examples--
-----------------------------------------
-{-
-    suffix array:
-                           i
-                          /
-                    _____|
-                    |
-                    v
-          0           1            2           3             4
-        ["$" (8), "e$" (7), "ense$" (4), "nonsense$" (0), "nse$" (5),    
-
-              5                   6            7          8
-    		"nsense$" (2), "onsense$" (1), "se$" (6), "sense$" (3)]
-
-	fused Cartesian tree:
-                               
-                         _____/|\_____
-                        /   |  |    | \
-                      [2    @  1    1  @]
-                      /|      /|    |\
-                    [@ @]   [3 @]  [@ @]
-                            / \
-                          [@   @]
-
-	(which translates to a suffix tree:
-                               _
-                         _____/|\______
-                        /   |  |    |  \
-                     [ se 1(*) n    e   8 ($) ]
-                ______/|      / \    \___________________
-                |      /   [ se  0 (*) ]     |           |
-          [3 (nse$)  6 ($) ] / \          [ 4 (nse$)   7 ($) ]
-                            /   \
-                      [5 (nse$)  5 ($) ]
-
-		(*:"onsense$")
-	)
-
-	preliminary stree, without internal nodes filled:
-
-		PInternal "" 0
-			[PLeaf "$" 8,
-			 PInternal "" 1
-			 	[PLeaf "e$" 7,
-			 	 PLeaf "ense$" 4],
-			 PInternal "" 1
-			 	[PLeaf "nonsense$" 0,
-			 	 PInternal "" 3
-			 	 	[PLeaf "nse$" 5,
-			 	 	 PLeaf "nsense$" 2]
-			 	],
-			 	PLeaf "onsense$" 1,
-			 	PInternal "" 2
-			 		[PLeaf "se$" 6,
-			 		 PLeaf "sense$" 3]
-			]
-
-	preliminary stree, with internal nodes filled:
-
-		PInternal "" 0
-			[PLeaf "$" 8,
-			 
-			 PInternal "e" 1
-			 	[PLeaf "$" 7,
-			 	 PLeaf "nse$" 4],
-			 
-			 PInternal "n" 1
-			 	[PLeaf "onsense$" 0,
-			 	 PInternal "se" 3
-			 	 	[PLeaf "$" 5,PLeaf "nse$" 2]],
-
-			 PLeaf "onsense$" 1,
-
-			 PInternal "se" 2
-			 	[PLeaf "$" 6,
-			 	 PLeaf "nse$" 3]]
--}
+	(node) : (concat . map (flatten . snd) . M.elems $ children)
