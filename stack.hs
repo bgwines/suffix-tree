@@ -1,4 +1,3 @@
-
 module Stack
 ( Stack(..)
 , Stack.empty

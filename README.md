@@ -74,8 +74,8 @@ Algorithm
 
 	- Radix sort them.
 
-- Using a standard merge algorithm (a la mergesort), merge the sorted lists of suffixes together into the overall suffix array.
-	- if two compared letters at indices are same, compare letters after them in string (slide 206)
+- 3-way merge the sorted lists of suffixes together into the overall suffix array.
+	- if two compared letters at indices are same, compare letters after them in string
 
 ####Step 2. Build LCP array `L` of adjacent elems in `S`
 

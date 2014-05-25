@@ -50,8 +50,3 @@ fuse cnode
 						if matches child
 							then get_children child
 							else [child]
-
-
-
-
-

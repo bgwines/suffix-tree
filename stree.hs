@@ -25,7 +25,7 @@ import HLib
 --                 Algebraic Data Types                 --
 ----------------------------------------------------------
 
-type SuffixArray = A.Array Int Int
+type SArray = A.Array Int Int
 
 {-
 	Internal nodes may have any number of children (alphabet permitting), but none will share the same first character (otherwise they would share a parent, which would be a child of this node. Thus, for querying purposes, we represent an internal node as a map from first characters to (substring, child) pairs.
@@ -81,8 +81,8 @@ pad str = if (last str) == '$'
 --                     Suffix Array                     --
 ----------------------------------------------------------
 
-construct_suffix_array :: S.ByteString -> SuffixArray
-construct_suffix_array str' = A.listArray bounds . map fst . L.sortBy (O.comparing snd) . zip [0..] . init . L.tails $ str
+construct_sarray :: S.ByteString -> SArray
+construct_sarray str' = A.listArray bounds . map fst . L.sortBy (O.comparing snd) . zip [0..] . init . L.tails $ str
 	where
 		str :: String
 		str = S.unpack str'
@@ -95,25 +95,25 @@ construct_suffix_array str' = A.listArray bounds . map fst . L.sortBy (O.compari
 ---------------------------------------------------------
 
 construct_stree :: String -> STree
-construct_stree str = suffix_array_to_stree str' suffix_array fused_ctree
+construct_stree str = sarray_to_stree str' sarray fused_ctree
 	where
 		str' :: S.ByteString
 		str' = S.pack . pad $ str
 
-		suffix_array :: SuffixArray
-		suffix_array = construct_suffix_array str'
+		sarray :: SArray
+		sarray = construct_sarray str'
 
 		lcps :: A.Array Int Int
-		lcps = get_pairwise_adjacent_lcps str' suffix_array
+		lcps = get_pairwise_adjacent_lcps str' sarray
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
 
-suffix_array_to_stree :: S.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
-suffix_array_to_stree str suffix_array tree = stree
+sarray_to_stree :: S.ByteString -> SArray -> FusedCTree.FusedCTree Int -> STree
+sarray_to_stree str sarray tree = stree
 	where
 		prelim_prelim_stree :: PreliminaryPreliminarySTree
-		prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree suffix_array tree 0	
+		prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree sarray tree 0	
 
 		prelim_stree :: PreliminarySTree
 		prelim_stree = fill_internal_nodes (S.length str) prelim_prelim_stree
@@ -161,20 +161,20 @@ fill_internal_nodes strlen node@(PPInternal i children) =
 		substr = substr_take i . get_substr . head $ filled_children
 
 -- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
-fctree_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
-fctree_to_prelim_prelim_stree suffix_array fused_ctree i =
+fctree_to_prelim_prelim_stree :: SArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
+fctree_to_prelim_prelim_stree sarray fused_ctree i =
 	if (FusedCTree.is_empty fused_ctree)
-		then (PPLeaf (suffix_array A.! i), i+1)
+		then (PPLeaf (sarray A.! i), i+1)
 		else (PPInternal lcp children, i')
 			where
 				lcp :: Int
 				lcp = FusedCTree.value fused_ctree
 
 				children_with_updated_is :: [(PreliminaryPreliminarySTree, Int)]
-				children_with_updated_is = tail $ scanl f (undefined, i) $ FusedCTree.get_children fused_ctree
+				children_with_updated_is = tail . scanl f (undefined, i) . FusedCTree.get_children $ fused_ctree
 					where
 						f :: (PreliminaryPreliminarySTree, Int) -> FusedCTree.FusedCTree Int -> (PreliminaryPreliminarySTree, Int)
-						f (_, i'') child = fctree_to_prelim_prelim_stree suffix_array child i''
+						f (_, i'') child = fctree_to_prelim_prelim_stree sarray child i''
 
 				i' :: Int
 				i' = snd . last $ children_with_updated_is
@@ -215,29 +215,34 @@ lcp s1 s2
 			is_empty :: S.ByteString -> Bool
 			is_empty s = (S.length s) == 0			
 
-get_pairwise_adjacent_lcps :: S.ByteString -> (A.Array Int Int) -> (A.Array Int Int)
-get_pairwise_adjacent_lcps str pos = get_height' 0 0 height_initial
+get_pairwise_adjacent_lcps :: S.ByteString -> SArray -> (A.Array Int Int)
+get_pairwise_adjacent_lcps str sarray = get_lpcs' 0 0 lpcs_initial
 	where
 		rank :: A.Array Int Int
-		rank = invert pos
+		rank = invert sarray
 
 		n :: Int
-		n = (alength pos) - 1
+		n = (alength sarray) - 1
 
-		height_initial :: A.Array Int Int
-		height_initial = A.listArray (0, n) $ replicate (n+1) 0
+		lpcs_initial :: A.Array Int Int
+		lpcs_initial = A.listArray (0, n) $ replicate (n+1) 0
 
-		get_height' :: Int -> Int -> (A.Array Int Int) -> (A.Array Int Int)
-		get_height' i h height
-			| (i == (alength rank) - 1) = height  -- -1 to skip "$"
-			| otherwise = get_height' (i+1) h' height'
+		get_lpcs' :: Int -> Int -> (A.Array Int Int) -> (A.Array Int Int)
+		get_lpcs' i overlap lpcs
+			| (i == (alength rank) - 1) = lpcs  -- -1 to skip "$"
+			| otherwise = get_lpcs' (i+1) overlap' lpcs'
 				where
-					h'' = lcp (S.drop i str) (S.drop k str)
+					overlap'' :: Int
+					overlap'' = lcp (S.drop i str) (S.drop k str)
 						where
-							k = pos A.! ((rank A.! i) - 1)
-							
-					height' = height A.// [((rank A.! i) - 1, h'')] -- -1 for 0-indexing
-					h' = if h'' > 0 then h'' - 1 else h''
+							k :: Int
+							k = sarray A.! ((rank A.! i) - 1)
+
+					lpcs' :: A.Array Int Int							
+					lpcs' = lpcs A.// [((rank A.! i) - 1, overlap'')] -- -1 for 0-indexing
+
+					overlap' :: Int
+					overlap' = if overlap'' > 0 then overlap'' - 1 else overlap''
 
 ---------------------------------------------------------
 --                       Graphing                      --
@@ -256,6 +261,11 @@ export_for_graphing str' stree = (nodes, edges)
 
 		flattened_tree :: [STree]
 		flattened_tree = flatten stree
+
+		flatten :: STree -> [STree]
+		flatten leaf@(Leaf _) = [leaf]
+		flatten node@(Internal children) =
+			(node) : (concat . map (flatten . snd) . M.elems $ children)
 
 		labelling :: [(Int, STree)]
 		labelling = zip [0..] flattened_tree
@@ -291,8 +301,3 @@ export_for_graphing str' stree = (nodes, edges)
 								
 								edge_label' :: Ly.Text
 								edge_label' = Ly.pack . S.unpack $ substring (fst childpair) str
-
-flatten :: STree -> [STree]
-flatten leaf@(Leaf _) = [leaf]
-flatten node@(Internal children) =
-	(node) : (concat . map (flatten . snd) . M.elems $ children)
