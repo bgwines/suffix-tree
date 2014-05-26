@@ -2,8 +2,8 @@
 {-# LANGUAGE InstanceSigs #-}
 
 module STree
-( STree(..)
-, construct_stree
+( SuffixTree(..)
+, construct
 , export_for_graphing
 ) where
 
@@ -32,6 +32,10 @@ type SArray = A.Array Int Int
 -}
 type Childrenmap = M.Map Char (Substring, STree)
 type Substring = (Int, Int)
+
+data SuffixTree
+	= Empty
+	| SuffixTree S.ByteString STree deriving Show
 
 data STree
 	= Leaf Int
@@ -94,8 +98,8 @@ construct_sarray str' = A.listArray bounds . map fst . L.sortBy (O.comparing snd
 --                     Suffix tree                     --
 ---------------------------------------------------------
 
-construct_stree :: String -> STree
-construct_stree str = sarray_to_stree str' sarray fused_ctree
+construct :: String -> SuffixTree
+construct str = SuffixTree str' stree
 	where
 		str' :: S.ByteString
 		str' = S.pack . pad $ str
@@ -108,6 +112,9 @@ construct_stree str = sarray_to_stree str' sarray fused_ctree
 
 		fused_ctree :: FusedCTree.FusedCTree Int
 		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
+
+		stree :: STree
+		stree = sarray_to_stree str' sarray fused_ctree
 
 sarray_to_stree :: S.ByteString -> SArray -> FusedCTree.FusedCTree Int -> STree
 sarray_to_stree str sarray tree = stree
@@ -253,12 +260,12 @@ type Node = (Int, Ly.Text)
 type Edge = (Int, Int, Ly.Text)
 type Label = Int
 
-export_for_graphing :: String -> STree -> Graph
-export_for_graphing str' stree = (nodes, edges)
-	where
-		str :: S.ByteString
-		str = S.pack . pad $ str'
+export_for_graphing :: SuffixTree -> Graph
+export_for_graphing suffix_tree@(SuffixTree str stree) = export_for_graphing' str stree
 
+export_for_graphing' :: S.ByteString -> STree -> Graph
+export_for_graphing' str stree = (nodes, edges)
+	where
 		flattened_tree :: [STree]
 		flattened_tree = flatten stree
 

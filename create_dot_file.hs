@@ -16,7 +16,7 @@ import STree
 
 stree_graph :: String -> Gr Text Text
 stree_graph str = mkGraph v e
-  where (v, e) = (export_for_graphing str) . construct_stree $ str
+  where (v, e) = export_for_graphing . construct $ str
 
 example_graph :: Gr Text Text
 example_graph = mkGraph [ (1,"one")
