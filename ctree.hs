@@ -10,7 +10,6 @@ module CTree
 ) where
 
 import qualified Data.Map as M
-import Stack
 import HLib
 
 data CTree a
