@@ -6,11 +6,11 @@ An implementation of a suffix tree.
 How to run:
 -----------
 
-    > runhaskell create_dot_file_final.hs > graph.dot
-    banana
-    > dot -Tpng graph.dot > graph.png
+    > alias graph='runhaskell create_dot_file.hs > graph.dot; dot -Tpng graph.dot > graph.png'
+    > graph
+    cacao
 
-(or whatever other string you want instead of `banana`)
+(or whatever other string you want instead of `cacao`)
 
 Dependencies
 ------------
@@ -18,13 +18,12 @@ Dependencies
 - [Haskell](http://www.haskell.org/haskellwiki/Haskell)
 - [GraphViz](http://graphviz.org/)
 - [Haskell GraphViz](https://hackage.haskell.org/package/graphviz)
+- [HLib](https://github.com/bgwines/hlib)
 
 Known issues
 ------------
 
 - Suffix array construction isn't DC3, so it's `O(n^2 log n)` instead of `O(n)`
-
-- Currently lacking functions on the tree itself (e.g. querying)
 
 Algorithm
 ---------
@@ -51,7 +50,7 @@ Algorithm
 2. Build LCP array `L` of adjacent elems in `S`
 3. Build suffix tree from suffix array and LCP array
 
-####Step 1: Build suffix array (DC3)
+####Step 1: Build suffix array `S` (DC3)
 
 - Recursively get the sorted order of all suffixes starting at positions that aren't multiples of three.
 	- Construct a new string based on suffixes starting at positions in `T1:` and `T2`.

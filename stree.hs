@@ -4,6 +4,7 @@
 module STree
 ( SuffixTree(..)
 , construct
+, contains_substring
 , export_for_graphing
 ) where
 
@@ -93,6 +94,45 @@ construct_sarray str' = A.listArray bounds . map fst . L.sortBy (O.comparing snd
 
 		bounds :: (Int, Int)
 		bounds = (0, (length str) - 1)
+
+---------------------------------------------------------
+--                Suffix tree functions                --
+---------------------------------------------------------
+
+-- TODO: longest palindromic substring, longest common substring between n strings, etc.
+
+contains_substring :: SuffixTree -> String -> Bool
+contains_substring suffix_tree@Empty str = False
+contains_substring suffix_tree@(SuffixTree str' stree) str =
+	contains_substring' stree (S.pack str) str'
+
+contains_substring' :: STree -> S.ByteString -> S.ByteString -> Bool
+contains_substring' stree@(Leaf i) str original_str =
+	str `is_prefix_of` (S.drop i original_str)
+contains_substring' stree@(Internal children) str original_str =
+	let
+		child :: Maybe (Substring, STree)
+		child = M.lookup (S.head str) children
+
+		_' :: (Substring, STree)
+		_'@((i, len), child') = from_just child
+
+		edge_label :: S.ByteString
+		edge_label = S.take len . S.drop i $ original_str
+
+		str' :: S.ByteString
+		str' = S.drop (S.length edge_label) str
+	in
+		if child == Nothing
+			then False
+			else if is_prefix_of str edge_label
+				then True
+				else if is_prefix_of edge_label str
+					then contains_substring' child' str' original_str
+					else False
+
+is_prefix_of :: S.ByteString -> S.ByteString -> Bool
+is_prefix_of s s' = s == (S.take (S.length s) s')
 
 ---------------------------------------------------------
 --                     Suffix tree                     --
