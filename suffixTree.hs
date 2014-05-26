@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module STree
+module SuffixTree
 ( SuffixTree(..)
-, construct
+, SuffixTree.construct
 , contains_substring
 , export_for_graphing
 ) where
@@ -15,18 +15,19 @@ import qualified Data.Array as A
 import qualified Data.Text.Lazy as Ly
 import qualified Data.ByteString.Char8 as S
 
+import Data.Maybe
 import Data.Monoid
 
 import qualified CTree
 import qualified FusedCTree
 
-import HLib
+import qualified HLib as H
+
+import SuffixArray
 
 ----------------------------------------------------------
 --                 Algebraic Data Types                 --
 ----------------------------------------------------------
-
-type SArray = A.Array Int Int
 
 {-
 	Internal nodes may have any number of children (alphabet permitting), but none will share the same first character (otherwise they would share a parent, which would be a child of this node. Thus, for querying purposes, we represent an internal node as a map from first characters to (substring, child) pairs.
@@ -64,8 +65,8 @@ instance Eq STree where
 --                   Utility Functions                  --
 ----------------------------------------------------------
 
-substring :: Substring -> S.ByteString -> S.ByteString
-substring (i, len) = S.take len . S.drop i
+substring :: S.ByteString -> Substring -> S.ByteString
+substring str (i, len) = S.take len . S.drop i $ str
 
 substr_drop :: Int -> Substring -> Substring
 substr_drop d (i, len) = (i + d, len - d)
@@ -81,19 +82,6 @@ pad :: String -> String
 pad str = if (last str) == '$'
 	then str
 	else str ++ "$"
-
-----------------------------------------------------------
---                     Suffix Array                     --
-----------------------------------------------------------
-
-construct_sarray :: S.ByteString -> SArray
-construct_sarray str' = A.listArray bounds . map fst . L.sortBy (O.comparing snd) . zip [0..] . init . L.tails $ str
-	where
-		str :: String
-		str = S.unpack str'
-
-		bounds :: (Int, Int)
-		bounds = (0, (length str) - 1)
 
 ---------------------------------------------------------
 --                Suffix tree functions                --
@@ -115,7 +103,7 @@ contains_substring' stree@(Internal children) str original_str =
 		child = M.lookup (S.head str) children
 
 		_' :: (Substring, STree)
-		_'@((i, len), child') = from_just child
+		_'@((i, len), child') = fromJust child
 
 		edge_label :: S.ByteString
 		edge_label = S.take len . S.drop i $ original_str
@@ -144,8 +132,8 @@ construct str = SuffixTree str' stree
 		str' :: S.ByteString
 		str' = S.pack . pad $ str
 
-		sarray :: SArray
-		sarray = construct_sarray str'
+		sarray :: SuffixArray
+		sarray = SuffixArray.construct_naive str'
 
 		lcps :: A.Array Int Int
 		lcps = get_pairwise_adjacent_lcps str' sarray
@@ -156,7 +144,7 @@ construct str = SuffixTree str' stree
 		stree :: STree
 		stree = sarray_to_stree str' sarray fused_ctree
 
-sarray_to_stree :: S.ByteString -> SArray -> FusedCTree.FusedCTree Int -> STree
+sarray_to_stree :: S.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
 sarray_to_stree str sarray tree = stree
 	where
 		prelim_prelim_stree :: PreliminaryPreliminarySTree
@@ -208,7 +196,7 @@ fill_internal_nodes strlen node@(PPInternal i children) =
 		substr = substr_take i . get_substr . head $ filled_children
 
 -- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
-fctree_to_prelim_prelim_stree :: SArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
+fctree_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
 fctree_to_prelim_prelim_stree sarray fused_ctree i =
 	if (FusedCTree.is_empty fused_ctree)
 		then (PPLeaf (sarray A.! i), i+1)
@@ -262,7 +250,7 @@ lcp s1 s2
 			is_empty :: S.ByteString -> Bool
 			is_empty s = (S.length s) == 0			
 
-get_pairwise_adjacent_lcps :: S.ByteString -> SArray -> (A.Array Int Int)
+get_pairwise_adjacent_lcps :: S.ByteString -> SuffixArray -> (A.Array Int Int)
 get_pairwise_adjacent_lcps str sarray = get_lpcs' 0 0 lpcs_initial
 	where
 		rank :: A.Array Int Int
@@ -318,7 +306,7 @@ export_for_graphing' str stree = (nodes, edges)
 		labelling = zip [0..] flattened_tree
 
 		get_label :: STree -> Int
-		get_label node = fst . find_guaranteed matches $ labelling
+		get_label node = fst . H.find_guaranteed matches $ labelling
 			where
 				matches :: (Int, STree) -> Bool
 				matches (_, node') = (node == node')
@@ -347,4 +335,4 @@ export_for_graphing' str stree = (nodes, edges)
 								child_label = get_label . snd $ childpair
 								
 								edge_label' :: Ly.Text
-								edge_label' = Ly.pack . S.unpack $ substring (fst childpair) str
+								edge_label' = Ly.pack . S.unpack $ substring str (fst childpair)

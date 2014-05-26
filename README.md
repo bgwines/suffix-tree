@@ -23,7 +23,7 @@ Dependencies
 Known issues
 ------------
 
-- Suffix array construction isn't DC3, so it's `O(n^2 log n)` instead of `O(n)`
+- DC3 implementation doesn't use radix sort, so it's `O(n log n)` instead of linear.
 
 Algorithm
 ---------
@@ -54,13 +54,13 @@ Algorithm
 
 - Recursively get the sorted order of all suffixes starting at positions that aren't multiples of three.
 	- Construct a new string based on suffixes starting at positions in `T1:` and `T2`.
-		- Begin by computing `T1` and `T2` and padding each with `'$'` until the lengths are multiples of three, then strcat
+		- Begin by computing `T$[1:]` and `T$[2:]` and padding each with `'$'` until the lengths are multiples of three, then strcat
 
 		- Treat each block of three characters as its own character.
 		
 		- Can determine the relative ordering of those characters by an time radix sort.
 
-		- To keep the alphabet small, replace each block of three characters with its index.
+		- Replace each block of three characters with its index.
 
 		- Recursively compute the suffix array of that string.
 
