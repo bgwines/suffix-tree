@@ -278,8 +278,14 @@ suffix_merge_cmp str relative_suffix_orderings i0 i12 =
 				i0' = f i0
 				i12' = f i12
 
+				-- when recursing on the blocks of `T$[1:] ++ T$[2:]` (plus padding), we don't append '$', so if we're at the last char and it's not '$', we *do* want to use its suffix ordering.
+				is_last_char_and_shouldnt_use :: Int -> Bool
+				is_last_char_and_shouldnt_use nk =
+					(nk == (S.length str) - 1) &&
+					((S.index str nk) == '$')
+
 				f :: Int -> Int
-				f n = if (n + k) == (S.length str) - 1
+				f n = if is_last_char_and_shouldnt_use (n + k)
 					then n + k - 1 -- -1 is to not use ordering of '$, which will always be 0, defeating the purpose'
 					else n + k
 			in
