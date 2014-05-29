@@ -18,6 +18,8 @@ import qualified Data.ByteString.Char8 as S
 import Data.Maybe
 import Data.Monoid
 
+import Test.QuickCheck
+
 import qualified CTree
 import qualified FusedCTree
 
@@ -90,6 +92,7 @@ pad str = if (last str) == '$'
 -- TODO: longest palindromic substring, longest common substring between n strings, etc.
 
 contains_substring :: SuffixTree -> String -> Bool
+contains_substring _ "" = True
 contains_substring suffix_tree@Empty str = False
 contains_substring suffix_tree@(SuffixTree str' stree) str =
 	contains_substring' stree (S.pack str) str'
@@ -121,6 +124,24 @@ contains_substring' stree@(Internal children) str original_str =
 
 is_prefix_of :: S.ByteString -> S.ByteString -> Bool
 is_prefix_of s s' = s == (S.take (S.length s) s')
+
+runtests :: IO ()
+runtests = quickCheckWith stdArgs { maxSuccess = 50000 } test_stree_substr_query
+
+test_stree_substr_query :: String -> Bool
+test_stree_substr_query s = invalid || all_substrings_present
+	where
+		invalid :: Bool
+		invalid = '$' `elem` s
+
+		all_substrings_present :: Bool
+		all_substrings_present = or . map (contains_substring stree) $ all_substrings
+
+		all_substrings :: [String]
+		all_substrings = L.nub . concat . map L.inits . L.tails $ s
+
+		stree :: SuffixTree
+		stree = construct s
 
 ---------------------------------------------------------
 --                     Suffix tree                     --

@@ -304,13 +304,13 @@ suffix_merge_cmp str relative_suffix_orderings i0 i12 =
 				 (ch12, ch12_1, suffix_order12_2)
 
 runtests :: IO ()
-runtests = quickCheckWith stdArgs { maxSuccess = 5000 } test
+runtests = quickCheckWith stdArgs { maxSuccess = 5000 } test_dc3
 
-test :: String -> Bool
-test s = (valid s) || ((dc3 s') == (construct_naive s'))
+test_dc3 :: String -> Bool
+test_dc3 s = invalid || ((dc3 s') == (construct_naive s'))
 	where
-		valid :: String -> Bool
-		valid s = '$' `elem` s
+		invalid :: Bool
+		invalid = '$' `elem` s
 
 		s' :: S.ByteString
 		s' = S.pack $ s ++ "$"
