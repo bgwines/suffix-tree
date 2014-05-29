@@ -73,7 +73,7 @@ order_blocks blocks doubled_str = uniquely_ordered_blocks
 
 		uniquely_ordered_blocks :: [Order]
 		uniquely_ordered_blocks =
-			if not . sorted_contains_duplicates $ block_ordering
+			if not . contains_duplicates $ block_ordering
 				then block_ordering
 				else apply_transformation . A.elems . dc3 . S.pack . map chr $ block_ordering
 					-- The condition of the if-statement above acts as a base case since (the recursion can never reach a depth greater than one).
@@ -136,17 +136,7 @@ get_suffix_ordering_T1T2 str = initial' A.// (zip
 			block_ordering = order_blocks blocks doubled_str
 
 			partitioning :: [[Order]]
-			partitioning =
-				if even . length $ block_ordering
-					then partitioning'
-					else [a ++ b, c]
-					where
-						a = partitioning' !! 0
-						b = partitioning' !! 1
-						c = partitioning' !! 2
-
-						partitioning' :: [[Order]]
-						partitioning' = H.partition ((length block_ordering) `div` 2) $ block_ordering
+			partitioning = partition_into_k 2 block_ordering
 
 			-- by construction of `partitioning`, these will be the only two elems
 			ordering_of_T1_suffixes :: [Order]
@@ -160,9 +150,24 @@ get_suffix_ordering_T1T2 str = initial' A.// (zip
 				(indices_in_Tk str 1)
 				ordering_of_T1_suffixes)
 
-sorted_contains_duplicates :: (Eq a) => [a] -> Bool
-sorted_contains_duplicates [] = False
-sorted_contains_duplicates l = or $ zipWith (==) l (tail l)
+partition_into_k :: Int -> [a] -> [[a]]
+partition_into_k k arr = H.partition block_size arr
+    where
+        block_size :: Int
+        block_size = if (((length arr) `mod` k) == 0)
+            then (length arr) `div` k
+            else (length arr) `div` k + 1
+
+-- TODO: do this more monadically?
+contains_duplicates :: forall a . (Ord a) => [a] -> Bool
+contains_duplicates l = (foldr (insert) (Just Set.empty) l) == Nothing
+    where
+        insert :: a -> Maybe (Set.Set a) -> Maybe (Set.Set a)
+        insert a s = if s == Nothing
+            then Nothing
+            else if Set.member a (fromJust s)
+                then Nothing
+                else Just (Set.insert a (fromJust s))
 
 mergeBy :: (Ord a) => (a -> a -> Ordering) -> [a] -> [a] -> [a]
 mergeBy cmp as bs
@@ -280,61 +285,33 @@ get_suffix_ordering_T0 str suffix_ordering_T1T2 =
 suffix_merge_cmp :: S.ByteString -> A.Array Index Order -> Index -> Index -> Ordering
 suffix_merge_cmp str relative_suffix_orderings i0 i12 =
 	let
-		ch_ordering :: Ordering
-		ch_ordering = (S.index str i0) `compare` (S.index str i12)
-	
-		-- Don't need to worry about walking off end of array because fo the `+ 1`ing; there will only be one '$' in the string, so we won't hit this case
-		-- Only call with k=1 or k=2 (not k=0)
-		suffix_ordering_of_ch_k_after :: Int -> Ordering
-		suffix_ordering_of_ch_k_after k =
-			let
-				i0' = f i0
-				i12' = f i12
+		ch0  = S.index str i0
+		ch12 = S.index str i12
 
-				-- when recursing on the blocks of `T$[1:] ++ T$[2:]` (plus padding), we don't append '$', so if we're at the last char and it's not '$', we *do* want to use its suffix ordering.
-				is_last_char_and_shouldnt_use :: Int -> Bool
-				is_last_char_and_shouldnt_use nk =
-					(nk == ((S.length str) - 1)) &&
-					((S.index str nk) == '$')
+		ch0_1  = S.index str (i0  + 1)
+		ch12_1 = S.index str (i12 + 1)
 
-				f :: Int -> Int
-				f n = if is_last_char_and_shouldnt_use (n + k)
-					then n + k - 1 -- -1 is to not use ordering of '$, which will always be 0, defeating the purpose'
-					else n + k
-			in
-				compare
-					(relative_suffix_orderings A.! i0')
-					(relative_suffix_orderings A.! i12')
+		suffix_order0_1  = relative_suffix_orderings A.! (i0  + 1)
+		suffix_order12_1 = relative_suffix_orderings A.! (i12 + 1)
 
-		ch_and_suffix_ordering_of_ch_after :: Ordering
-		ch_and_suffix_ordering_of_ch_after =
-			case compare
-				(S.index str (i0 + 1))
-				(S.index str (i12 + 1))
-			of
-				LT -> LT
-				GT -> GT
-				EQ -> suffix_ordering_of_ch_k_after 2
+		suffix_order0_2  = relative_suffix_orderings A.! (i0  + 2)
+		suffix_order12_2 = relative_suffix_orderings A.! (i12 + 2)
 	in
-		case ch_ordering of
-			LT -> LT
-			GT -> GT
-			EQ -> if (i12 + 1) `mod` 3 == 0 -- (i0 + 1) `mod` 3 /= 0 ever
-				then ch_and_suffix_ordering_of_ch_after
-				else case suffix_ordering_of_ch_k_after 1 of
-					LT -> LT
-					GT -> GT
-					EQ -> error "The suffix ordering is between suffixes that are both not 0 mod 3, so we know this ordering won't be `EQ`. The fact that we're getting `EQ` now means there's a bug somewhere."
-
-test0 :: Bool
-test0 = (A.elems . dc3 . S.pack $ "monsoonnomnoms$") == [14,9,0,12,6,7,10,2,8,11,5,1,4,3,13]
+		if (i12 `mod` 3) == 1
+			then (ch0,  suffix_order0_1) `compare`
+				 (ch12, suffix_order12_1)
+			else (ch0,  ch0_1,  suffix_order0_2) `compare` 
+				 (ch12, ch12_1, suffix_order12_2)
 
 runtests :: IO ()
-runtests = quickCheck test
+runtests = quickCheckWith stdArgs { maxSuccess = 5000 } test
 
 test :: String -> Bool
-test s = (dc3 s') == (construct_naive s')
+test s = (valid s) || ((dc3 s') == (construct_naive s'))
 	where
+		valid :: String -> Bool
+		valid s = '$' `elem` s
+
 		s' :: S.ByteString
 		s' = S.pack $ s ++ "$"
 
@@ -358,7 +335,7 @@ dc3 str = if (S.length str) <= 3
 			index_order_T1T2
 			where
 				cmpfn :: Index -> Index -> Ordering
-				cmpfn = (suffix_merge_cmp str relative_suffix_orderings)
+				cmpfn = suffix_merge_cmp str relative_suffix_orderings
 
 				index_order_T0 :: [Index]
 				index_order_T0 = (A.elems . f $ suffix_ordering_T0)

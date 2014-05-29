@@ -133,7 +133,7 @@ construct str = SuffixTree str' stree
 		str' = S.pack . pad $ str
 
 		sarray :: SuffixArray
-		sarray = SuffixArray.construct_naive str'
+		sarray = SuffixArray.dc3 str'
 
 		lcps :: A.Array Int Int
 		lcps = get_pairwise_adjacent_lcps str' sarray

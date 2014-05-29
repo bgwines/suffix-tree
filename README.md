@@ -16,14 +16,14 @@ Dependencies
 ------------
 
 - [Haskell](http://www.haskell.org/haskellwiki/Haskell)
-- [GraphViz](http://graphviz.org/) -- `brew install graphviz`
-- [Haskell GraphViz](https://hackage.haskell.org/package/graphviz) -- `cabal install graphviz`
+- [GraphViz](http://graphviz.org/) (`brew install graphviz`)
+- [Haskell GraphViz](https://hackage.haskell.org/package/graphviz) (`cabal install graphviz`)
 - [HLib](https://github.com/bgwines/hlib)
 
 Known issues
 ------------
 
-- DC3 implementation doesn't use radix sort, so it's `O(n log n)` instead of linear.
+- DC3 implementation uses regular sorting instead of radix sort, so it's `O(n log n)` instead of linear.
 
 - Found a bug? E-mail me at `bgwines@cs.stanford.edu` to let me know and I'll get right on it :)
 
