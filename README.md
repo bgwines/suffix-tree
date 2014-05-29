@@ -6,7 +6,7 @@ An implementation of a suffix tree.
 How to run:
 -----------
 
-    > alias graph='runhaskell create_dot_file.hs > graph.dot; dot -Tpng graph.dot > graph.png'
+    > alias graph='runhaskell dot.hs > graph.dot; dot -Tpng graph.dot > graph.png'
     > graph
     cacao
 
