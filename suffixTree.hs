@@ -148,6 +148,7 @@ test_stree_substr_query s = invalid || all_substrings_present
 ---------------------------------------------------------
 
 construct :: String -> SuffixTree
+construct "" = Empty
 construct str = SuffixTree str' stree
 	where
 		str' :: S.ByteString
@@ -310,6 +311,7 @@ type Edge = (Int, Int, Ly.Text)
 type Label = Int
 
 export_for_graphing :: SuffixTree -> Graph
+export_for_graphing suffix_tree@(Empty) = ([], [])
 export_for_graphing suffix_tree@(SuffixTree str stree) = export_for_graphing' str stree
 
 export_for_graphing' :: S.ByteString -> STree -> Graph
