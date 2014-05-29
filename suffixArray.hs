@@ -15,6 +15,8 @@ import qualified Data.ByteString.Char8 as S
 
 import qualified Data.Set as Set
 
+import Test.QuickCheck
+
 import Data.Char
 import Data.Maybe
 
@@ -118,6 +120,7 @@ order_blocks' blocks doubled_str = map (sort_map M.!) blocks
 				sorted_blocks = L.sortBy (O.comparing (substring doubled_str)) blocks
 
 -- At index `i` is the sort order of the suffix starting at `i` (within `T1` \union `T2`)
+-- Assumes an input string of length at least something like 3
 get_suffix_ordering_T1T2 :: S.ByteString -> A.Array Index Order
 get_suffix_ordering_T1T2 str = initial' A.// (zip
 	(indices_in_Tk str 2)
@@ -133,7 +136,17 @@ get_suffix_ordering_T1T2 str = initial' A.// (zip
 			block_ordering = order_blocks blocks doubled_str
 
 			partitioning :: [[Order]]
-			partitioning = H.partition ((length block_ordering) `div` 2) $ block_ordering -- can assume it's divisible by 2 by construction of `blocks`
+			partitioning =
+				if even . length $ block_ordering
+					then partitioning'
+					else [a ++ b, c]
+					where
+						a = partitioning' !! 0
+						b = partitioning' !! 1
+						c = partitioning' !! 2
+
+						partitioning' :: [[Order]]
+						partitioning' = H.partition ((length block_ordering) `div` 2) $ block_ordering
 
 			-- by construction of `partitioning`, these will be the only two elems
 			ordering_of_T1_suffixes :: [Order]
@@ -281,7 +294,7 @@ suffix_merge_cmp str relative_suffix_orderings i0 i12 =
 				-- when recursing on the blocks of `T$[1:] ++ T$[2:]` (plus padding), we don't append '$', so if we're at the last char and it's not '$', we *do* want to use its suffix ordering.
 				is_last_char_and_shouldnt_use :: Int -> Bool
 				is_last_char_and_shouldnt_use nk =
-					(nk == (S.length str) - 1) &&
+					(nk == ((S.length str) - 1)) &&
 					((S.index str nk) == '$')
 
 				f :: Int -> Int
@@ -316,8 +329,19 @@ suffix_merge_cmp str relative_suffix_orderings i0 i12 =
 test0 :: Bool
 test0 = (A.elems . dc3 . S.pack $ "monsoonnomnoms$") == [14,9,0,12,6,7,10,2,8,11,5,1,4,3,13]
 
+runtests :: IO ()
+runtests = quickCheck test
+
+test :: String -> Bool
+test s = (dc3 s') == (construct_naive s')
+	where
+		s' :: S.ByteString
+		s' = S.pack $ s ++ "$"
+
 dc3 :: S.ByteString -> SuffixArray
-dc3 str = A.listArray (0, (S.length str) - 1) suffix_ordering_all_sorted
+dc3 str = if (S.length str) <= 3
+	then construct_naive str -- doubling-and-padding logic doesn't play incely with strings not long enough
+	else A.listArray (0, (S.length str) - 1) suffix_ordering_all_sorted
 	where
 		suffix_ordering_T1T2 :: A.Array Index Order
 		suffix_ordering_T1T2 = get_suffix_ordering_T1T2 str
