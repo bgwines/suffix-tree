@@ -8,12 +8,11 @@ module SuffixTree
 , export_for_graphing
 ) where
 
-import qualified Data.Map as M
-import qualified Data.Ord as O
-import qualified Data.List as L
-import qualified Data.Array as A
+import qualified Data.Map as Map
+import qualified Data.List as List
+import qualified Data.Array as Array
 import qualified Data.Text.Lazy as Ly
-import qualified Data.ByteString.Char8 as S
+import qualified Data.ByteString.Char8 as ByteString
 
 import Data.Maybe
 import Data.Monoid
@@ -32,18 +31,18 @@ import SuffixArray
 ----------------------------------------------------------
 
 {-
-	Internal nodes may have any number of children (alphabet permitting), but none will share the same first character (otherwise they would share a parent, which would be a child of this node. Thus, for querying purposes, we represent an internal node as a map from first characters to (substring, child) pairs.
+	Internal nodes may have any number of children (alphabet permitting), but none will share the same first character (otherwise they would share a parent, which would be a child of this node. Thus, for querying purposes, we represent an internal node as a map from first characters to (substring, child) pairByteString.
 -}
-type Childrenmap = M.Map Char (Substring, STree)
+type ChildrenMap = Map.Map Char (Substring, STree)
 type Substring = (Int, Int)
 
 data SuffixTree
 	= Empty
-	| SuffixTree S.ByteString STree deriving Show
+	| SuffixTree ByteString.ByteString STree deriving Show
 
 data STree
 	= Leaf Int
-	| Internal Childrenmap deriving Show
+	| Internal ChildrenMap deriving Show
 
 data PreliminarySTree
 	= PLeaf Substring Int
@@ -67,8 +66,8 @@ instance Eq STree where
 --                   Utility Functions                  --
 ----------------------------------------------------------
 
-substring :: S.ByteString -> Substring -> S.ByteString
-substring str (i, len) = S.take len . S.drop i $ str
+substring :: ByteString.ByteString -> Substring -> ByteString.ByteString
+substring str (i, len) = ByteString.take len . ByteString.drop i $ str
 
 substr_drop :: Int -> Substring -> Substring
 substr_drop d (i, len) = (i + d, len - d)
@@ -95,24 +94,24 @@ contains_substring :: SuffixTree -> String -> Bool
 contains_substring _ "" = True
 contains_substring suffix_tree@Empty str = False
 contains_substring suffix_tree@(SuffixTree str' stree) str =
-	contains_substring' stree (S.pack str) str'
+	contains_substring' stree (ByteString.pack str) str'
 
-contains_substring' :: STree -> S.ByteString -> S.ByteString -> Bool
+contains_substring' :: STree -> ByteString.ByteString -> ByteString.ByteString -> Bool
 contains_substring' stree@(Leaf i) str original_str =
-	str `is_prefix_of` (S.drop i original_str)
+	str `is_prefix_of` (ByteString.drop i original_str)
 contains_substring' stree@(Internal children) str original_str =
 	let
 		child :: Maybe (Substring, STree)
-		child = M.lookup (S.head str) children
+		child = Map.lookup (ByteString.head str) children
 
 		_' :: (Substring, STree)
 		_'@((i, len), child') = fromJust child
 
-		edge_label :: S.ByteString
-		edge_label = S.take len . S.drop i $ original_str
+		edge_label :: ByteString.ByteString
+		edge_label = ByteString.take len . ByteString.drop i $ original_str
 
-		str' :: S.ByteString
-		str' = S.drop (S.length edge_label) str
+		str' :: ByteString.ByteString
+		str' = ByteString.drop (ByteString.length edge_label) str
 	in
 		if child == Nothing
 			then False
@@ -122,11 +121,11 @@ contains_substring' stree@(Internal children) str original_str =
 					then contains_substring' child' str' original_str
 					else False
 
-is_prefix_of :: S.ByteString -> S.ByteString -> Bool
-is_prefix_of s s' = s == (S.take (S.length s) s')
+is_prefix_of :: ByteString.ByteString -> ByteString.ByteString -> Bool
+is_prefix_of s s' = s == (ByteString.take (ByteString.length s) s')
 
 runtests :: IO ()
-runtests = quickCheckWith stdArgs { maxSuccess = 50000 } test_stree_substr_query
+runtests = quickCheckWith stdArgs { maxSuccess = 20000 } test_stree_substr_query
 
 test_stree_substr_query :: String -> Bool
 test_stree_substr_query s = invalid || all_substrings_present
@@ -138,7 +137,7 @@ test_stree_substr_query s = invalid || all_substrings_present
 		all_substrings_present = or . map (contains_substring stree) $ all_substrings
 
 		all_substrings :: [String]
-		all_substrings = L.nub . concat . map L.inits . L.tails $ s
+		all_substrings = List.nub . concat . map List.inits . List.tails $ s
 
 		stree :: SuffixTree
 		stree = construct s
@@ -151,48 +150,48 @@ construct :: String -> SuffixTree
 construct "" = Empty
 construct str = SuffixTree str' stree
 	where
-		str' :: S.ByteString
-		str' = S.pack . pad $ str
+		str' :: ByteString.ByteString
+		str' = ByteString.pack . pad $ str
 
 		sarray :: SuffixArray
 		sarray = SuffixArray.dc3 str'
 
-		lcps :: A.Array Int Int
+		lcps :: Array.Array Int Int
 		lcps = get_pairwise_adjacent_lcps str' sarray
 
 		fused_ctree :: FusedCTree.FusedCTree Int
-		fused_ctree = FusedCTree.fuse . CTree.fromList . A.elems $ lcps
+		fused_ctree = FusedCTree.fuse . CTree.fromList . Array.elems $ lcps
 
 		stree :: STree
 		stree = sarray_to_stree str' sarray fused_ctree
 
-sarray_to_stree :: S.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
-sarray_to_stree str sarray tree = stree
+sarray_to_stree :: ByteString.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
+sarray_to_stree str sarray fused_ctree = stree
 	where
 		prelim_prelim_stree :: PreliminaryPreliminarySTree
-		prelim_prelim_stree = fst $ fctree_to_prelim_prelim_stree sarray tree 0	
+		prelim_prelim_stree = fst $ fctree_and_sarray_to_prelim_prelim_stree sarray fused_ctree 0	
 
 		prelim_stree :: PreliminarySTree
-		prelim_stree = fill_internal_nodes (S.length str) prelim_prelim_stree
+		prelim_stree = fill_internal_nodes (ByteString.length str) prelim_prelim_stree
 
 		stree :: STree
 		stree = prelim_stree_to_stree prelim_stree str
 
-prelim_stree_to_stree :: PreliminarySTree -> S.ByteString -> STree
+prelim_stree_to_stree :: PreliminarySTree -> ByteString.ByteString -> STree
 prelim_stree_to_stree (PLeaf s i) _ = Leaf i
 prelim_stree_to_stree (PInternal s children) str = Internal children_map
 	where
-		children_map :: Childrenmap
-		children_map = foldr insert M.empty children
+		children_map :: ChildrenMap
+		children_map = foldr insert Map.empty children
 
-		insert :: PreliminarySTree -> Childrenmap -> Childrenmap
-		insert child = M.insert edge_label (substr, child')
+		insert :: PreliminarySTree -> ChildrenMap -> ChildrenMap
+		insert child = Map.insert edge_label (substr, child')
 			where
 				substr :: Substring
 				substr = get_substr child
 
 				edge_label :: Char
-				edge_label = S.index str (fst substr)
+				edge_label = ByteString.index str (fst substr)
 
 				child' :: STree
 				child' = prelim_stree_to_stree child str
@@ -218,10 +217,10 @@ fill_internal_nodes strlen node@(PPInternal i children) =
 		substr = substr_take i . get_substr . head $ filled_children
 
 -- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
-fctree_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
-fctree_to_prelim_prelim_stree sarray fused_ctree i =
+fctree_and_sarray_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
+fctree_and_sarray_to_prelim_prelim_stree sarray fused_ctree i =
 	if (FusedCTree.is_empty fused_ctree)
-		then (PPLeaf (sarray A.! i), i+1)
+		then (PPLeaf (sarray Array.! i), i+1)
 		else (PPInternal lcp children, i')
 			where
 				lcp :: Int
@@ -231,7 +230,7 @@ fctree_to_prelim_prelim_stree sarray fused_ctree i =
 				children_with_updated_is = tail . scanl f (undefined, i) . FusedCTree.get_children $ fused_ctree
 					where
 						f :: (PreliminaryPreliminarySTree, Int) -> FusedCTree.FusedCTree Int -> (PreliminaryPreliminarySTree, Int)
-						f (_, i'') child = fctree_to_prelim_prelim_stree sarray child i''
+						f (_, i'') child = fctree_and_sarray_to_prelim_prelim_stree sarray child i''
 
 				i' :: Int
 				i' = snd . last $ children_with_updated_is
@@ -243,13 +242,13 @@ fctree_to_prelim_prelim_stree sarray fused_ctree i =
 --                    Pair-wise LCP                    --
 ---------------------------------------------------------
 
-alength :: (A.Array Int b) -> Int
-alength = snd . A.bounds
+alength :: (Array.Array Int b) -> Int
+alength = snd . Array.bounds
 
-invert :: (A.Array Int Int) -> (A.Array Int Int)
-invert arr = A.array (0, alength arr) $ zip (A.elems arr) (A.indices arr)
+invert :: (Array.Array Int Int) -> (Array.Array Int Int)
+invert arr = Array.array (0, alength arr) $ zip (Array.elems arr) (Array.indices arr)
 
-lcp :: S.ByteString -> S.ByteString -> Int
+lcp :: ByteString.ByteString -> ByteString.ByteString -> Int
 lcp s1 s2
 	| is_empty s1 = 0
 	| is_empty s2 = 0
@@ -258,45 +257,45 @@ lcp s1 s2
 		else 0
 		where
 			ch1 :: Char
-			ch1 = S.index s1 0
+			ch1 = ByteString.index s1 0
 
 			ch2 :: Char
-			ch2 = S.index s2 0
+			ch2 = ByteString.index s2 0
 
-			s1' :: S.ByteString
-			s1' = S.drop 1 s1
+			s1' :: ByteString.ByteString
+			s1' = ByteString.drop 1 s1
 
-			s2' :: S.ByteString
-			s2' = S.drop 1 s2
+			s2' :: ByteString.ByteString
+			s2' = ByteString.drop 1 s2
 
-			is_empty :: S.ByteString -> Bool
-			is_empty s = (S.length s) == 0			
+			is_empty :: ByteString.ByteString -> Bool
+			is_empty s = (ByteString.length s) == 0			
 
-get_pairwise_adjacent_lcps :: S.ByteString -> SuffixArray -> (A.Array Int Int)
+get_pairwise_adjacent_lcps :: ByteString.ByteString -> SuffixArray -> (Array.Array Int Int)
 get_pairwise_adjacent_lcps str sarray = get_lpcs' 0 0 lpcs_initial
 	where
-		rank :: A.Array Int Int
+		rank :: Array.Array Int Int
 		rank = invert sarray
 
 		n :: Int
 		n = (alength sarray) - 1
 
-		lpcs_initial :: A.Array Int Int
-		lpcs_initial = A.listArray (0, n) $ replicate (n+1) 0
+		lpcs_initial :: Array.Array Int Int
+		lpcs_initial = Array.listArray (0, n) $ replicate (n+1) 0
 
-		get_lpcs' :: Int -> Int -> (A.Array Int Int) -> (A.Array Int Int)
+		get_lpcs' :: Int -> Int -> (Array.Array Int Int) -> (Array.Array Int Int)
 		get_lpcs' i overlap lpcs
 			| (i == (alength rank) - 1) = lpcs  -- -1 to skip "$"
 			| otherwise = get_lpcs' (i+1) overlap' lpcs'
 				where
 					overlap'' :: Int
-					overlap'' = lcp (S.drop i str) (S.drop k str)
+					overlap'' = lcp (ByteString.drop i str) (ByteString.drop k str)
 						where
 							k :: Int
-							k = sarray A.! ((rank A.! i) - 1)
+							k = sarray Array.! ((rank Array.! i) - 1)
 
-					lpcs' :: A.Array Int Int							
-					lpcs' = lpcs A.// [((rank A.! i) - 1, overlap'')] -- -1 for 0-indexing
+					lpcs' :: Array.Array Int Int							
+					lpcs' = lpcs Array.// [((rank Array.! i) - 1, overlap'')] -- -1 for 0-indexing
 
 					overlap' :: Int
 					overlap' = if overlap'' > 0 then overlap'' - 1 else overlap''
@@ -314,7 +313,7 @@ export_for_graphing :: SuffixTree -> Graph
 export_for_graphing suffix_tree@(Empty) = ([], [])
 export_for_graphing suffix_tree@(SuffixTree str stree) = export_for_graphing' str stree
 
-export_for_graphing' :: S.ByteString -> STree -> Graph
+export_for_graphing' :: ByteString.ByteString -> STree -> Graph
 export_for_graphing' str stree = (nodes, edges)
 	where
 		flattened_tree :: [STree]
@@ -323,7 +322,7 @@ export_for_graphing' str stree = (nodes, edges)
 		flatten :: STree -> [STree]
 		flatten leaf@(Leaf _) = [leaf]
 		flatten node@(Internal children) =
-			(node) : (concat . map (flatten . snd) . M.elems $ children)
+			(node) : (concat . map (flatten . snd) . Map.elems $ children)
 
 		labelling :: [(Int, STree)]
 		labelling = zip [0..] flattened_tree
@@ -346,7 +345,7 @@ export_for_graphing' str stree = (nodes, edges)
 			where
 				edgeify :: STree -> [(Int, Int, Ly.Text)]
 				edgeify tree@(Leaf _) = []
-				edgeify tree@(Internal children) = map edgeify_child $ M.elems children
+				edgeify tree@(Internal children) = map edgeify_child $ Map.elems children
 					where
 						edgeify_child :: (Substring, STree) -> (Int, Int, Ly.Text)
 						edgeify_child childpair = (parent_label, child_label, edge_label')
@@ -358,4 +357,4 @@ export_for_graphing' str stree = (nodes, edges)
 								child_label = get_label . snd $ childpair
 								
 								edge_label' :: Ly.Text
-								edge_label' = Ly.pack . S.unpack $ substring str (fst childpair)
+								edge_label' = Ly.pack . ByteString.unpack $ substring str (fst childpair)
