@@ -2,8 +2,7 @@
 
 module SuffixArray
 ( SuffixArray(..)
-, construct_naive
-, dc3
+, construct
 ) where
 
 import qualified Data.Map as Map
@@ -25,6 +24,9 @@ type Order = Int
 type SuffixArray = Array.Array Int Index
 type Substring = (Index, Int)
 
+nul :: Char
+nul = chr 0
+
 substring :: ByteString.ByteString -> Substring -> ByteString.ByteString
 substring str (i, len) = ByteString.take len . ByteString.drop i $ str
 
@@ -37,14 +39,11 @@ substr_take t (i, len) = (i, t)
 initial_array :: ByteString.ByteString -> Array.Array Int Int
 initial_array str = Array.listArray (0, (ByteString.length str) - 1) $ repeat (-1)
 
-construct_naive :: ByteString.ByteString -> SuffixArray
-construct_naive str' = Array.listArray bounds . map fst . List.sortBy (Ord.comparing snd) . zip [0..] . init . List.tails $ str
+construct_naive :: String -> SuffixArray
+construct_naive str = Array.listArray bounds . map fst . List.sortBy (Ord.comparing snd) . zip [0..] . init . List.tails . pad $ str
 	where
-		str :: String
-		str = ByteString.unpack str'
-
 		bounds :: (Int, Int)
-		bounds = (0, (length str) - 1)
+		bounds = (0, (length (pad str)) - 1)
 
 pad_and_double :: ByteString.ByteString -> ByteString.ByteString
 pad_and_double str = (f 1) `ByteString.append` (f 2)
@@ -53,7 +52,7 @@ pad_and_double str = (f 1) `ByteString.append` (f 2)
 		f k = pad_to_3 . ByteString.drop k $ str
 
 		pad_to_3 :: ByteString.ByteString -> ByteString.ByteString
-		pad_to_3 s = s `ByteString.append` (ByteString.pack (replicate k '$'))
+		pad_to_3 s = s `ByteString.append` (ByteString.pack (replicate k nul))
 			where
 				k :: Int
 				k = if mod3 == 0
@@ -304,17 +303,28 @@ runtests :: IO ()
 runtests = quickCheckWith stdArgs { maxSuccess = 5000 } test_dc3
 
 test_dc3 :: String -> Bool
-test_dc3 s = invalid || ((dc3 s') == (construct_naive s'))
+test_dc3 s = invalid || ((construct s) == (construct_naive s))
 	where
 		invalid :: Bool
-		invalid = '$' `elem` s
+		invalid = nul `elem` s
 
-		s' :: ByteString.ByteString
-		s' = ByteString.pack $ s ++ "$"
+pad :: String -> String
+pad "" = "\0"
+pad str = if (last str) == nul
+	then str
+	else str ++ [nul]
+
+construct :: String -> SuffixArray
+construct str = if nul `elem` str
+	then error error_message
+	else dc3 . ByteString.pack . pad $ str
+	where
+		error_message :: String
+		error_message = "Input (" ++ str ++ ") not accepted (input string contains the NUL-terminator ('\\0'))."
 
 dc3 :: ByteString.ByteString -> SuffixArray
 dc3 str = if (ByteString.length str) <= 3
-	then construct_naive str -- doubling-and-padding logic doesn't play incely with strings not long enough
+	then construct_naive (ByteString.unpack str) -- doubling-and-padding logic doesn't play incely with strings not long enough
 	else Array.listArray (0, (ByteString.length str) - 1) suffix_ordering_all_sorted
 	where
 		suffix_ordering_T1T2 :: Array.Array Index Order
@@ -342,4 +352,3 @@ dc3 str = if (ByteString.length str) <= 3
 
 				f :: Array.Array Index Order -> Array.Array Int Index
 				f = array_of_sort_orders_to_sorted_array_of_indices
-

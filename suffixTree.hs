@@ -14,6 +14,7 @@ import qualified Data.Array as Array
 import qualified Data.Text.Lazy as Ly
 import qualified Data.ByteString.Char8 as ByteString
 
+import Data.Char
 import Data.Maybe
 import Data.Monoid
 
@@ -66,6 +67,9 @@ instance Eq STree where
 --                   Utility Functions                  --
 ----------------------------------------------------------
 
+nul :: Char
+nul = chr 0
+
 substring :: ByteString.ByteString -> Substring -> ByteString.ByteString
 substring str (i, len) = ByteString.take len . ByteString.drop i $ str
 
@@ -80,9 +84,9 @@ get_substr (PLeaf substr _) = substr
 get_substr (PInternal substr _) = substr
 
 pad :: String -> String
-pad str = if (last str) == '$'
+pad str = if (last str) == nul
 	then str
-	else str ++ "$"
+	else str ++ [nul]
 
 ---------------------------------------------------------
 --                Suffix tree functions                --
@@ -125,22 +129,22 @@ is_prefix_of :: ByteString.ByteString -> ByteString.ByteString -> Bool
 is_prefix_of s s' = s == (ByteString.take (ByteString.length s) s')
 
 runtests :: IO ()
-runtests = quickCheckWith stdArgs { maxSuccess = 20000 } test_stree_substr_query
+runtests = quickCheckWith stdArgs { maxSuccess = 500 } test_stree_substr_query
 
 test_stree_substr_query :: String -> Bool
 test_stree_substr_query s = invalid || all_substrings_present
 	where
 		invalid :: Bool
-		invalid = '$' `elem` s
+		invalid = nul `elem` s
 
 		all_substrings_present :: Bool
-		all_substrings_present = or . map (contains_substring stree) $ all_substrings
+		all_substrings_present = and . map (contains_substring stree) $ all_substrings
 
 		all_substrings :: [String]
 		all_substrings = List.nub . concat . map List.inits . List.tails $ s
 
 		stree :: SuffixTree
-		stree = construct s
+		stree = SuffixTree.construct s
 
 ---------------------------------------------------------
 --                     Suffix tree                     --
@@ -148,22 +152,25 @@ test_stree_substr_query s = invalid || all_substrings_present
 
 construct :: String -> SuffixTree
 construct "" = Empty
-construct str = SuffixTree str' stree
-	where
-		str' :: ByteString.ByteString
-		str' = ByteString.pack . pad $ str
+construct str =
+	if nul `elem` str
+		then error "Input not accepted (input string contains the NUL-terminator ('\\0'))."
+		else SuffixTree str' stree
+		where
+			str' :: ByteString.ByteString
+			str' = ByteString.pack . pad $ str
 
-		sarray :: SuffixArray
-		sarray = SuffixArray.dc3 str'
+			sarray :: SuffixArray
+			sarray = SuffixArray.construct str
 
-		lcps :: Array.Array Int Int
-		lcps = get_pairwise_adjacent_lcps str' sarray
+			lcps :: Array.Array Int Int
+			lcps = get_pairwise_adjacent_lcps str' sarray
 
-		fused_ctree :: FusedCTree.FusedCTree Int
-		fused_ctree = FusedCTree.fuse . CTree.fromList . Array.elems $ lcps
+			fused_ctree :: FusedCTree.FusedCTree Int
+			fused_ctree = FusedCTree.fuse . CTree.fromList . Array.elems $ lcps
 
-		stree :: STree
-		stree = sarray_to_stree str' sarray fused_ctree
+			stree :: STree
+			stree = sarray_to_stree str' sarray fused_ctree
 
 sarray_to_stree :: ByteString.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
 sarray_to_stree str sarray fused_ctree = stree
@@ -272,21 +279,21 @@ lcp s1 s2
 			is_empty s = (ByteString.length s) == 0			
 
 get_pairwise_adjacent_lcps :: ByteString.ByteString -> SuffixArray -> (Array.Array Int Int)
-get_pairwise_adjacent_lcps str sarray = get_lpcs' 0 0 lpcs_initial
+get_pairwise_adjacent_lcps str sarray = get_lcps' 0 0 lcps_initial
 	where
 		rank :: Array.Array Int Int
 		rank = invert sarray
 
 		n :: Int
-		n = (alength sarray) - 1
+		n = (alength sarray) - 1 -- -1 because this is for pair-wise adjascent values
 
-		lpcs_initial :: Array.Array Int Int
-		lpcs_initial = Array.listArray (0, n) $ replicate (n+1) 0
+		lcps_initial :: Array.Array Int Int
+		lcps_initial = Array.listArray (0, n) $ replicate (n+1) 0
 
-		get_lpcs' :: Int -> Int -> (Array.Array Int Int) -> (Array.Array Int Int)
-		get_lpcs' i overlap lpcs
-			| (i == (alength rank) - 1) = lpcs  -- -1 to skip "$"
-			| otherwise = get_lpcs' (i+1) overlap' lpcs'
+		get_lcps' :: Int -> Int -> (Array.Array Int Int) -> (Array.Array Int Int)
+		get_lcps' i overlap lcps
+			| (i == (alength rank) - 1) = lcps  -- -1 to skip "$"
+			| otherwise = get_lcps' (i+1) overlap' lcps'
 				where
 					overlap'' :: Int
 					overlap'' = lcp (ByteString.drop i str) (ByteString.drop k str)
@@ -294,8 +301,8 @@ get_pairwise_adjacent_lcps str sarray = get_lpcs' 0 0 lpcs_initial
 							k :: Int
 							k = sarray Array.! ((rank Array.! i) - 1)
 
-					lpcs' :: Array.Array Int Int							
-					lpcs' = lpcs Array.// [((rank Array.! i) - 1, overlap'')] -- -1 for 0-indexing
+					lcps' :: Array.Array Int Int
+					lcps' = lcps Array.// [((rank Array.! i) - 1, overlap'')] -- -1 for 0-indexing
 
 					overlap' :: Int
 					overlap' = if overlap'' > 0 then overlap'' - 1 else overlap''
@@ -311,7 +318,10 @@ type Label = Int
 
 export_for_graphing :: SuffixTree -> Graph
 export_for_graphing suffix_tree@(Empty) = ([], [])
-export_for_graphing suffix_tree@(SuffixTree str stree) = export_for_graphing' str stree
+export_for_graphing suffix_tree@(SuffixTree str stree) = export_for_graphing' str' stree
+	where
+		str' :: ByteString.ByteString
+		str' = ByteString.append (ByteString.init str) (ByteString.pack "$")
 
 export_for_graphing' :: ByteString.ByteString -> STree -> Graph
 export_for_graphing' str stree = (nodes, edges)

@@ -10,7 +10,7 @@ How to run:
     > graph
     cacao
 
-(or whatever other string you want instead of `cacao`)
+(or whatever other string you want instead of "`cacao`")
 
 Dependencies
 ------------
@@ -24,8 +24,6 @@ Known issues
 ------------
 
 - DC3 implementation uses regular sorting instead of radix sort, so it's `O(n log n)` instead of linear.
-
-- Doesn't like input strings with `' '` in them.
 
 - Found a bug? E-mail me at `bgwines@cs.stanford.edu` to let me know and I'll get right on it :)
 
