@@ -39,11 +39,11 @@ type Substring = (Int, Int)
 
 data SuffixTree
 	= Empty
-	| SuffixTree ByteString.ByteString STree deriving Show
+	| SuffixTree ByteString.ByteString STree
 
 data STree
 	= Leaf Int
-	| Internal ChildrenMap deriving Show
+	| Internal ChildrenMap
 
 data PreliminarySTree
 	= PLeaf Substring Int
@@ -56,6 +56,16 @@ data PreliminaryPreliminarySTree
 ----------------------------------------------------------
 --                Instance Declarations                 --
 ----------------------------------------------------------
+
+instance Show SuffixTree where
+	show Empty = "Empty"
+	show (SuffixTree str stree) = "SuffixTree \"" ++ (ByteString.unpack str) ++ "\""
+
+instance Eq SuffixTree where
+	Empty == Empty  = True
+	Empty == _      = False
+	_     == Empty  = False
+	a@(SuffixTree str_a _) == b@(SuffixTree str_b _) = str_a == str_b
 
 instance Eq STree where
 	a@(Leaf _) == b@(Internal _) = False

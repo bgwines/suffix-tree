@@ -19,6 +19,8 @@ import Data.Maybe
 
 import qualified HLib as H
 
+-- TODO: make SuffixArray a data type that stores the string
+
 type Index = Int
 type Order = Int
 type SuffixArray = Array.Array Int Index
