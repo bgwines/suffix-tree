@@ -42,7 +42,14 @@ initial_array :: ByteString.ByteString -> Array.Array Int Int
 initial_array str = Array.listArray (0, (ByteString.length str) - 1) $ repeat (-1)
 
 construct_naive :: String -> SuffixArray
-construct_naive str = Array.listArray bounds . map fst . List.sortBy (Ord.comparing snd) . zip [0..] . init . List.tails . pad $ str
+construct_naive str = Array.listArray bounds
+	. map fst
+	. List.sortBy (Ord.comparing snd)
+	. zip [0..]
+	. init
+	. List.tails
+	. pad
+	$ str
 	where
 		bounds :: (Int, Int)
 		bounds = (0, (length (pad str)) - 1)
@@ -74,13 +81,20 @@ order_blocks blocks doubled_str = uniquely_ordered_blocks
 		uniquely_ordered_blocks =
 			if not . contains_duplicates $ block_ordering
 				then block_ordering
-				else apply_transformation . Array.elems . dc3 . ByteString.pack . map chr $ block_ordering
+				else apply_transformation
+					. Array.elems
+					. dc3
+					. ByteString.pack
+					. map chr
+					$ block_ordering
 					-- The condition of the if-statement above acts as a base case since (the recursion can never reach a depth greater than one).
 
 		-- input: array (0,9) [(0,9),(1,2),(2,3),(3,5),(4,7),(5,8),(6,6),(7,0),(8,1),(9,4)]
 		-- output: apply ([9] = 0, [2] = 1, ...) to something
 		apply_transformation :: [Order] -> [Order]
-		apply_transformation arr = Array.elems (Array.array (0, (length arr) - 1) (zip arr [0..]))
+		apply_transformation arr = Array.elems $ Array.array
+			(0, (length arr) - 1)
+			(zip arr [0..])
 
 -- input example:
 --     blocks: ["$$$","nom","nso","omn","oms","onn","ons","oon","s$$"]
@@ -91,19 +105,18 @@ order_blocks' :: [Substring] -> ByteString.ByteString -> [Order]
 order_blocks' blocks doubled_str = map (sort_map Map.!) blocks
 	where
 		sort_map :: Map.Map Substring Order
-		sort_map = foldr insert Map.empty $ blocks_with_order
+		sort_map = foldr insert Map.empty blocks_with_order
 			where
 				insert :: (Substring, Order) -> Map.Map Substring Order -> Map.Map Substring Order
-				insert (s, i) m = Map.insert s i m
+				insert (s, i) = Map.insert s i
 
 		blocks_with_order :: [(Substring, Int)]
 		blocks_with_order =
-			concat
-				. map clean
-					. (flip zip) [0..]
-						. List.groupBy substr_pair_eq
-							. map make_substr_pair
-								$ sorted_blocks
+			concatMap clean
+				. flip zip [0..]
+				. List.groupBy substr_pair_eq
+				. map make_substr_pair
+				$ sorted_blocks
 			where
 				clean :: ([(Substring, ByteString.ByteString)], Int) -> [(Substring, Int)]
 				clean (substrs, i) = map (\ss -> (fst ss, i)) substrs
@@ -158,19 +171,17 @@ partition_into_k k arr = H.partition block_size arr
 
 -- TODO: do this more monadically?
 contains_duplicates :: forall a . (Ord a) => [a] -> Bool
-contains_duplicates l = (foldr (insert) (Just Set.empty) l) == Nothing
+contains_duplicates = isNothing . foldr insert (Just Set.empty)
     where
         insert :: a -> Maybe (Set.Set a) -> Maybe (Set.Set a)
-        insert a s = if s == Nothing
-            then Nothing
-            else if Set.member a (fromJust s)
-                then Nothing
-                else Just (Set.insert a (fromJust s))
+        insert a s
+        	| (isNothing s) || (Set.member a (fromJust s)) = Nothing
+			| otherwise = Just (Set.insert a (fromJust s))
 
 mergeBy :: (Ord a) => (a -> a -> Ordering) -> [a] -> [a] -> [a]
 mergeBy cmp as bs
-	| (length as == 0) = bs
-	| (length bs == 0) = as
+	| null as = bs
+	| null bs = as
 	| otherwise =
 		let
 			a = head as
@@ -183,7 +194,7 @@ mergeBy cmp as bs
 					EQ -> a : mergeBy cmp as' bs
 					GT -> b : mergeBy cmp as  bs'
 
-alength :: (Array.Array Int b) -> Int
+alength :: Array.Array Int b -> Int
 alength = snd . Array.bounds
 
 {- The relative ordering array contains:
@@ -236,13 +247,13 @@ array_of_sort_orders_to_sorted_array_of_indices arr =
 			sorted_array_of_indices = Map.elems . foldr insert Map.empty $ arr'
 
 			insert :: (Index, Order) -> Map.Map Index Order -> Map.Map Order Index
-			insert (i, o) m = Map.insert o i m
+			insert (i, o) = Map.insert o i
 
 			arr' :: [(Index, Order)]
 			arr' = filter valid . zip [0..] . Array.elems $ arr
 
 			valid :: (Index, Order) -> Bool
-			valid (i, o) = (o /= -1)
+			valid (_, o) = o /= -1
 
 indices_in_Tk :: ByteString.ByteString -> Index -> [Index]
 indices_in_Tk str k = takeWhile in_range . map ((+k) . (*3)) $ [0..]
@@ -347,10 +358,10 @@ dc3 str = if (ByteString.length str) <= 3
 				cmpfn = suffix_merge_cmp str relative_suffix_orderings
 
 				index_order_T0 :: [Index]
-				index_order_T0 = (Array.elems . f $ suffix_ordering_T0)
+				index_order_T0 = Array.elems . f $ suffix_ordering_T0
 
 				index_order_T1T2 :: [Index]
-				index_order_T1T2 = (Array.elems . f $ suffix_ordering_T1T2)
+				index_order_T1T2 = Array.elems . f $ suffix_ordering_T1T2
 
 				f :: Array.Array Index Order -> Array.Array Int Index
 				f = array_of_sort_orders_to_sorted_array_of_indices

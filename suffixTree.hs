@@ -127,10 +127,10 @@ contains_substring' stree@(Internal children) str original_str =
 		str' :: ByteString.ByteString
 		str' = ByteString.drop (ByteString.length edge_label) str
 	in
-		if child == Nothing
+		if isNothing child
 			then False
 			else if is_prefix_of str edge_label
-				then True
+			then True
 				else if is_prefix_of edge_label str
 					then contains_substring' child' str' original_str
 					else False
@@ -148,10 +148,10 @@ test_stree_substr_query s = invalid || all_substrings_present
 		invalid = nul `elem` s
 
 		all_substrings_present :: Bool
-		all_substrings_present = and . map (contains_substring stree) $ all_substrings
+		all_substrings_present = all (contains_substring stree) all_substrings
 
 		all_substrings :: [String]
-		all_substrings = List.nub . concat . map List.inits . List.tails $ s
+		all_substrings = List.nub . concatMap List.inits . List.tails $ s
 
 		stree :: SuffixTree
 		stree = SuffixTree.construct s
@@ -236,7 +236,7 @@ fill_internal_nodes strlen node@(PPInternal i children) =
 -- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
 fctree_and_sarray_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
 fctree_and_sarray_to_prelim_prelim_stree sarray fused_ctree i =
-	if (FusedCTree.is_empty fused_ctree)
+	if FusedCTree.is_empty fused_ctree
 		then (PPLeaf (sarray Array.! i), i+1)
 		else (PPInternal lcp children, i')
 			where
@@ -259,10 +259,10 @@ fctree_and_sarray_to_prelim_prelim_stree sarray fused_ctree i =
 --                    Pair-wise LCP                    --
 ---------------------------------------------------------
 
-alength :: (Array.Array Int b) -> Int
+alength :: Array.Array Int b -> Int
 alength = snd . Array.bounds
 
-invert :: (Array.Array Int Int) -> (Array.Array Int Int)
+invert :: Array.Array Int Int -> Array.Array Int Int
 invert arr = Array.array (0, alength arr) $ zip (Array.elems arr) (Array.indices arr)
 
 lcp :: ByteString.ByteString -> ByteString.ByteString -> Int
@@ -288,7 +288,7 @@ lcp s1 s2
 			is_empty :: ByteString.ByteString -> Bool
 			is_empty s = (ByteString.length s) == 0			
 
-get_pairwise_adjacent_lcps :: ByteString.ByteString -> SuffixArray -> (Array.Array Int Int)
+get_pairwise_adjacent_lcps :: ByteString.ByteString -> SuffixArray -> Array.Array Int Int
 get_pairwise_adjacent_lcps str sarray = get_lcps' 0 0 lcps_initial
 	where
 		rank :: Array.Array Int Int
@@ -300,7 +300,7 @@ get_pairwise_adjacent_lcps str sarray = get_lcps' 0 0 lcps_initial
 		lcps_initial :: Array.Array Int Int
 		lcps_initial = Array.listArray (0, n) $ replicate (n+1) 0
 
-		get_lcps' :: Int -> Int -> (Array.Array Int Int) -> (Array.Array Int Int)
+		get_lcps' :: Int -> Int -> Array.Array Int Int -> Array.Array Int Int
 		get_lcps' i overlap lcps
 			| (i == (alength rank) - 1) = lcps  -- -1 to skip "$"
 			| otherwise = get_lcps' (i+1) overlap' lcps'
@@ -342,7 +342,7 @@ export_for_graphing' str stree = (nodes, edges)
 		flatten :: STree -> [STree]
 		flatten leaf@(Leaf _) = [leaf]
 		flatten node@(Internal children) =
-			(node) : (concat . map (flatten . snd) . Map.elems $ children)
+			(node) : (concatMap (flatten . snd) . Map.elems $ children)
 
 		labelling :: [(Int, STree)]
 		labelling = zip [0..] flattened_tree
@@ -357,11 +357,11 @@ export_for_graphing' str stree = (nodes, edges)
 		nodes = map nodeify labelling
 			where
 				nodeify :: (Int, STree) -> Node
-				nodeify (i, (Leaf i')) = (i, (Ly.pack . show $ i'))
-				nodeify (i, (Internal _)) = (i, (Ly.pack ""))
+				nodeify (i, Leaf i') = (i, (Ly.pack . show $ i'))
+				nodeify (i, Internal _) = (i, (Ly.pack ""))
 
 		edges :: [Edge]
-		edges = concat . map edgeify $ flattened_tree
+		edges = concatMap edgeify flattened_tree
 			where
 				edgeify :: STree -> [(Int, Int, Ly.Text)]
 				edgeify tree@(Leaf _) = []
