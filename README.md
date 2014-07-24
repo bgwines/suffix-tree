@@ -6,9 +6,8 @@ An implementation of a suffix tree.
 How to run:
 -----------
 
-    > alias graph='runhaskell dot.hs > graph.dot; dot -Tpng graph.dot > graph.png'
-    > graph
-    cacao
+    > ghci suffixTree.hs
+    λ graph . SuffixTree.construct $ "cacao"
 
 (or whatever other string you want instead of "`cacao`")
 
@@ -18,7 +17,7 @@ Dependencies
 - [Haskell](http://www.haskell.org/haskellwiki/Haskell)
 - [GraphViz](http://graphviz.org/) (`brew install graphviz`)
 - [Haskell GraphViz](https://hackage.haskell.org/package/graphviz) (`cabal install graphviz`)
-- [HLib](https://github.com/bgwines/hlib)
+- [Zora](https://hackage.haskell.org/package/Zora) (`cabal install zora`)
 
 Known issues
 ------------
@@ -60,7 +59,7 @@ Algorithm
 
 		- Treat each block of three characters as its own character.
 		
-		- Can determine the relative ordering of those characters by an time radix sort.
+		- Can determine the relative ordering of those characters by radix sort.
 
 		- Replace each block of three characters with its index.
 

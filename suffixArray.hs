@@ -17,7 +17,7 @@ import Test.QuickCheck
 import Data.Char
 import Data.Maybe
 
-import qualified HLib as H
+import qualified Zora.List as ZList
 
 -- TODO: make SuffixArray a data type that stores the string
 
@@ -79,7 +79,7 @@ order_blocks blocks doubled_str = uniquely_ordered_blocks
 
 		uniquely_ordered_blocks :: [Order]
 		uniquely_ordered_blocks =
-			if not . contains_duplicates $ block_ordering
+			if not . ZList.contains_duplicates $ block_ordering
 				then block_ordering
 				else apply_transformation
 					. Array.elems
@@ -148,7 +148,7 @@ get_suffix_ordering_T1T2 str = initial' Array.// (zip
 			block_ordering = order_blocks blocks doubled_str
 
 			partitioning :: [[Order]]
-			partitioning = partition_into_k 2 block_ordering
+			partitioning = ZList.partition_into_k 2 block_ordering
 
 			ordering_of_T1_suffixes :: [Order]
 			ordering_of_T1_suffixes = partitioning !! 0
@@ -160,39 +160,6 @@ get_suffix_ordering_T1T2 str = initial' Array.// (zip
 			initial' = (initial_array str) Array.// (zip
 				(indices_in_Tk str 1)
 				ordering_of_T1_suffixes)
-
-partition_into_k :: Int -> [a] -> [[a]]
-partition_into_k k arr = H.partition block_size arr
-    where
-        block_size :: Int
-        block_size = if (((length arr) `mod` k) == 0)
-            then (length arr) `div` k
-            else (length arr) `div` k + 1
-
--- TODO: do this more monadically?
-contains_duplicates :: forall a . (Ord a) => [a] -> Bool
-contains_duplicates = isNothing . foldr insert (Just Set.empty)
-    where
-        insert :: a -> Maybe (Set.Set a) -> Maybe (Set.Set a)
-        insert a s
-        	| (isNothing s) || (Set.member a (fromJust s)) = Nothing
-			| otherwise = Just (Set.insert a (fromJust s))
-
-mergeBy :: (Ord a) => (a -> a -> Ordering) -> [a] -> [a] -> [a]
-mergeBy cmp as bs
-	| null as = bs
-	| null bs = as
-	| otherwise =
-		let
-			a = head as
-			b = head bs
-			as' = tail as
-			bs' = tail bs
-		in
-			case cmp a b of
-					LT -> a : mergeBy cmp as' bs
-					EQ -> a : mergeBy cmp as' bs
-					GT -> b : mergeBy cmp as  bs'
 
 alength :: Array.Array Int b -> Int
 alength = snd . Array.bounds
@@ -350,7 +317,7 @@ dc3 str = if (ByteString.length str) <= 3
 		relative_suffix_orderings = get_relative_suffix_orderings suffix_ordering_T0 suffix_ordering_T1T2
 
 		suffix_ordering_all_sorted :: [Order]
-		suffix_ordering_all_sorted = mergeBy cmpfn
+		suffix_ordering_all_sorted = ZList.merge_by cmpfn
 			index_order_T0
 			index_order_T1T2
 			where

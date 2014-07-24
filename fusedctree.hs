@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module FusedCTree
 ( FusedCTree(..)
@@ -7,13 +8,24 @@ module FusedCTree
 , FusedCTree.get_children
 , FusedCTree.is_empty
 , FusedCTree.empty
+, G.graph
 ) where
 
 import qualified CTree
 
+import qualified Zora.Graphing.DAGGraphing as G
+
 data FusedCTree a
 	= Empty
-	| Node a [FusedCTree a] deriving Show
+	| Node a [FusedCTree a]
+	deriving (Show, Eq)
+
+instance (Show a) => G.DAGGraphable (FusedCTree a) where
+	expand :: FusedCTree a -> Maybe (Maybe String, [(Maybe String, FusedCTree a)])
+	expand Empty = Nothing
+	expand (Node e children) = Just
+		( Just (show e)
+		, map (\x -> (Nothing, x)) children )
 
 empty :: FusedCTree a
 empty = Empty

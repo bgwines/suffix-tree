@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module CTree
 ( CTree(..)
@@ -7,10 +8,12 @@ module CTree
 , CTree.right_child
 , CTree.value
 , CTree.is_empty
+, G.graph
 ) where
 
 import qualified Data.Map as M
-import HLib
+
+import qualified Zora.Graphing.DAGGraphing as G
 
 data CTree a
 	= Empty
@@ -29,6 +32,12 @@ instance (Ord a) => Ord (CTree a) where
 	Empty < _ = True
 	_ < Empty = False
 	x < y = (value x) < (value y)
+	x <= y = (x == y) || (x < y)
+
+instance (Show a) => G.DAGGraphable (CTree a) where
+	expand :: CTree a -> Maybe (Maybe String, [(Maybe String, CTree a)])
+	expand Empty = Nothing
+	expand (Node e l r) = Just (Just (show e), [(Nothing, l), (Nothing, r)])
 
 left_child :: CTree a -> CTree a
 left_child (Node _ l _) = l
@@ -90,7 +99,7 @@ insert_at_point (z@(foci, root), False) new_elem = ([], Node new_elem root Empty
 insert_at_point
 	(z@(foci, parent@(Node e l r)), True) -- can assume `parent` will never be `Empty` (see `parent_of_new_elem`)
 	new_elem
-	= go_right (foci, parent')
+	= go_right $ (foci, parent')
 		where
 			new_node_left_child :: CTree a
 			new_node_left_child = if has_right_child z
@@ -105,18 +114,29 @@ insert_at_point
 ---------------------------
 
 parent_of_new_elem :: (Ord a) => a -> Zipper a -> (Zipper a, Bool)
-parent_of_new_elem new_elem z@(_, tree@(Node e _ _))
-	| e <= new_elem = (z, True) -- True signifies yes parent (regular case)
-	| not . has_parent $ z = (z, False) -- False signifies no parent
-	| otherwise = parent_of_new_elem new_elem (go_up z)
+parent_of_new_elem new_elem z@(foci, tree@(Node e l r)) =
+	if e <= new_elem
+		then (z, True) -- True signifies yes parent (regular case)
+		else if not . has_parent $ z
+			then (z, False) -- False signifies no parent
+			else parent_of_new_elem new_elem (go_up z)
 
 -- can make this just a wrapper, probably
 fromList :: forall a . (Ord a) => [a] -> CTree a
 fromList [] = Empty
-fromList list = fromList' (tail list) zipper0
+fromList list = fromList' list' zipper0
 	where
+		e :: a
+		e = head list
+
+		list' :: [a]
+		list' = tail list
+
+		node :: CTree a
+		node = Node e Empty Empty
+
 		zipper0 :: Zipper a
-		zipper0 = ([], Node (head list) Empty Empty)
+		zipper0 = ([], node)
 
 fromList' :: forall a . (Ord a) => [a] -> Zipper a -> CTree a 
 fromList' [] z = snd . go_to_top $ z

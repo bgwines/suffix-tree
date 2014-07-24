@@ -5,7 +5,7 @@ module SuffixTree
 ( SuffixTree(..)
 , SuffixTree.construct
 , contains_substring
-, export_for_graphing
+, graph
 ) where
 
 import qualified Data.Map as Map
@@ -23,7 +23,8 @@ import Test.QuickCheck
 import qualified CTree
 import qualified FusedCTree
 
-import qualified HLib as H
+import qualified Zora.List as ZList
+import qualified Zora.Graphing.DAGGraphing as G
 
 import SuffixArray
 
@@ -43,7 +44,7 @@ data SuffixTree
 
 data STree
 	= Leaf Int
-	| Internal ChildrenMap
+	| Internal ChildrenMap deriving Show
 
 data PreliminarySTree
 	= PLeaf Substring Int
@@ -72,6 +73,45 @@ instance Eq STree where
 	a@(Internal _) == b@(Leaf _) = False
 	a@(Leaf i) == b@(Leaf i') = i == i'
 	a@(Internal children) == b@(Internal children') = children == children'
+
+type GraphableChildrenMap = Map.Map String GraphableSTree
+data GraphableSTree
+	= GLeaf Int
+	| GInternal GraphableChildrenMap
+	deriving (Show, Eq)
+
+instance G.DAGGraphable GraphableSTree where
+	expand :: GraphableSTree -> Maybe (Maybe String, [(Maybe String, GraphableSTree)])
+	expand (GLeaf i) = Just (Just (show i), [])
+	expand (GInternal cmap) = Just (Nothing, edges)
+		where
+			edges :: [(Maybe String, GraphableSTree)]
+			edges = map show' (Map.toList cmap)
+
+			show' :: (String, GraphableSTree) -> (Maybe String, GraphableSTree)
+			show' (a, b) =
+				if last a /= nul
+					then (Just a, b)
+					else (Just ((init a) ++ "$"), b)
+
+make_graphable :: STree -> String -> GraphableSTree
+make_graphable (Leaf i) s = GLeaf i
+make_graphable (Internal cmap) s = GInternal cmap'
+	where
+		cmap' :: GraphableChildrenMap
+		cmap' = Map.fromList . map f . Map.toList $ cmap
+
+		f :: (Char, (Substring, STree)) -> (String, GraphableSTree)
+		f (ch, ((i, n), child)) =
+			( ZList.subseq (fromIntegral i) (fromIntegral n) s
+			, make_graphable child s )
+
+graph :: SuffixTree -> IO String
+graph Empty = return "Empty tree -- nothing to graph."
+graph (SuffixTree str stree)
+	= G.graph
+	. flip make_graphable (ByteString.unpack str)
+	$ stree
 
 ----------------------------------------------------------
 --                   Utility Functions                  --
@@ -316,65 +356,3 @@ get_pairwise_adjacent_lcps str sarray = get_lcps' 0 0 lcps_initial
 
 					overlap' :: Int
 					overlap' = if overlap'' > 0 then overlap'' - 1 else overlap''
-
----------------------------------------------------------
---                       Graphing                      --
----------------------------------------------------------
-
-type Graph = ([Node], [Edge])
-type Node = (Int, Ly.Text)
-type Edge = (Int, Int, Ly.Text)
-type Label = Int
-
-export_for_graphing :: SuffixTree -> Graph
-export_for_graphing suffix_tree@(Empty) = ([], [])
-export_for_graphing suffix_tree@(SuffixTree str stree) = export_for_graphing' str' stree
-	where
-		str' :: ByteString.ByteString
-		str' = ByteString.append (ByteString.init str) (ByteString.pack "$")
-
-export_for_graphing' :: ByteString.ByteString -> STree -> Graph
-export_for_graphing' str stree = (nodes, edges)
-	where
-		flattened_tree :: [STree]
-		flattened_tree = flatten stree
-
-		flatten :: STree -> [STree]
-		flatten leaf@(Leaf _) = [leaf]
-		flatten node@(Internal children) =
-			(node) : (concatMap (flatten . snd) . Map.elems $ children)
-
-		labelling :: [(Int, STree)]
-		labelling = zip [0..] flattened_tree
-
-		get_label :: STree -> Int
-		get_label node = fst . H.find_guaranteed matches $ labelling
-			where
-				matches :: (Int, STree) -> Bool
-				matches (_, node') = (node == node')
-
-		nodes :: [Node]
-		nodes = map nodeify labelling
-			where
-				nodeify :: (Int, STree) -> Node
-				nodeify (i, Leaf i') = (i, (Ly.pack . show $ i'))
-				nodeify (i, Internal _) = (i, (Ly.pack ""))
-
-		edges :: [Edge]
-		edges = concatMap edgeify flattened_tree
-			where
-				edgeify :: STree -> [(Int, Int, Ly.Text)]
-				edgeify tree@(Leaf _) = []
-				edgeify tree@(Internal children) = map edgeify_child $ Map.elems children
-					where
-						edgeify_child :: (Substring, STree) -> (Int, Int, Ly.Text)
-						edgeify_child childpair = (parent_label, child_label, edge_label')
-							where
-								parent_label :: Int
-								parent_label = get_label tree
-
-								child_label :: Int
-								child_label = get_label . snd $ childpair
-								
-								edge_label' :: Ly.Text
-								edge_label' = Ly.pack . ByteString.unpack $ substring str (fst childpair)
