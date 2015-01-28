@@ -3,6 +3,8 @@ suffix-tree
 
 An implementation of a suffix tree.
 
+[![Build Status](https://travis-ci.org/bgwines/suffix-tree.svg?branch=master)](https://travis-ci.org/bgwines/suffix-tree)
+
 How to run:
 -----------
 

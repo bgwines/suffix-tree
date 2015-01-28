@@ -18,15 +18,13 @@ import Data.Char
 import Data.Maybe
 import Data.Monoid
 
-import Test.QuickCheck
-
 import qualified CTree
 import qualified FusedCTree
 
 import qualified Zora.List as ZList
 import qualified Zora.Graphing.DAGGraphing as G
 
-import SuffixArray
+import qualified SuffixArray as SA
 
 ----------------------------------------------------------
 --                 Algebraic Data Types                 --
@@ -178,24 +176,6 @@ contains_substring' stree@(Internal children) str original_str =
 is_prefix_of :: ByteString.ByteString -> ByteString.ByteString -> Bool
 is_prefix_of s s' = s == (ByteString.take (ByteString.length s) s')
 
-runtests :: IO ()
-runtests = quickCheckWith stdArgs { maxSuccess = 500 } test_stree_substr_query
-
-test_stree_substr_query :: String -> Bool
-test_stree_substr_query s = invalid || all_substrings_present
-	where
-		invalid :: Bool
-		invalid = nul `elem` s
-
-		all_substrings_present :: Bool
-		all_substrings_present = all (contains_substring stree) all_substrings
-
-		all_substrings :: [String]
-		all_substrings = List.nub . concatMap List.inits . List.tails $ s
-
-		stree :: SuffixTree
-		stree = SuffixTree.construct s
-
 ---------------------------------------------------------
 --                     Suffix tree                     --
 ---------------------------------------------------------
@@ -210,8 +190,8 @@ construct str =
 			str' :: ByteString.ByteString
 			str' = ByteString.pack . pad $ str
 
-			sarray :: SuffixArray
-			sarray = SuffixArray.construct str
+			sarray :: SA.SuffixArray
+			sarray = SA.construct str
 
 			lcps :: Array.Array Int Int
 			lcps = get_pairwise_adjacent_lcps str' sarray
@@ -222,7 +202,7 @@ construct str =
 			stree :: STree
 			stree = sarray_to_stree str' sarray fused_ctree
 
-sarray_to_stree :: ByteString.ByteString -> SuffixArray -> FusedCTree.FusedCTree Int -> STree
+sarray_to_stree :: ByteString.ByteString -> SA.SuffixArray -> FusedCTree.FusedCTree Int -> STree
 sarray_to_stree str sarray fused_ctree = stree
 	where
 		prelim_prelim_stree :: PreliminaryPreliminarySTree
@@ -274,7 +254,7 @@ fill_internal_nodes strlen node@(PPInternal i children) =
 		substr = substr_take i . get_substr . head $ filled_children
 
 -- TODO: make `FusedCTree` an instance of `Foldable`, to make this easier?
-fctree_and_sarray_to_prelim_prelim_stree :: SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
+fctree_and_sarray_to_prelim_prelim_stree :: SA.SuffixArray -> FusedCTree.FusedCTree Int -> Int -> (PreliminaryPreliminarySTree, Int)
 fctree_and_sarray_to_prelim_prelim_stree sarray fused_ctree i =
 	if FusedCTree.is_empty fused_ctree
 		then (PPLeaf (sarray Array.! i), i+1)
@@ -328,7 +308,7 @@ lcp s1 s2
 			is_empty :: ByteString.ByteString -> Bool
 			is_empty s = (ByteString.length s) == 0			
 
-get_pairwise_adjacent_lcps :: ByteString.ByteString -> SuffixArray -> Array.Array Int Int
+get_pairwise_adjacent_lcps :: ByteString.ByteString -> SA.SuffixArray -> Array.Array Int Int
 get_pairwise_adjacent_lcps str sarray = get_lcps' 0 0 lcps_initial
 	where
 		rank :: Array.Array Int Int

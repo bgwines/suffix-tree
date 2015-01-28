@@ -3,6 +3,8 @@
 module SuffixArray
 ( SuffixArray(..)
 , construct
+, construct_naive -- for testing
+, nul -- for testing
 ) where
 
 import qualified Data.Map as Map
@@ -11,8 +13,6 @@ import qualified Data.Set as Set
 import qualified Data.List as List
 import qualified Data.Array as Array
 import qualified Data.ByteString.Char8 as ByteString
-
-import Test.QuickCheck
 
 import Data.Char
 import Data.Maybe
@@ -279,29 +279,6 @@ suffix_merge_cmp str relative_suffix_orderings i0 i12 =
 			else (ch0,  ch0_1,  suffix_order0_2) `compare` 
 				 (ch12, ch12_1, suffix_order12_2)
 
-runtests :: IO ()
-runtests = quickCheckWith stdArgs { maxSuccess = 5000 } test_dc3
-
-test_dc3 :: String -> Bool
-test_dc3 s = invalid || ((construct s) == (construct_naive s))
-	where
-		invalid :: Bool
-		invalid = nul `elem` s
-
-pad :: String -> String
-pad "" = "\0"
-pad str = if (last str) == nul
-	then str
-	else str ++ [nul]
-
-construct :: String -> SuffixArray
-construct str = if nul `elem` str
-	then error error_message
-	else dc3 . ByteString.pack . pad $ str
-	where
-		error_message :: String
-		error_message = "Input (" ++ str ++ ") not accepted (input string contains the NUL-terminator ('\\0'))."
-
 dc3 :: ByteString.ByteString -> SuffixArray
 dc3 str = if (ByteString.length str) <= 3
 	then construct_naive (ByteString.unpack str) -- doubling-and-padding logic doesn't play incely with strings not long enough
@@ -332,3 +309,17 @@ dc3 str = if (ByteString.length str) <= 3
 
 				f :: Array.Array Index Order -> Array.Array Int Index
 				f = array_of_sort_orders_to_sorted_array_of_indices
+
+pad :: String -> String
+pad "" = "\0"
+pad str = if (last str) == nul
+	then str
+	else str ++ [nul]
+
+construct :: String -> SuffixArray
+construct str = if nul `elem` str
+	then error error_message
+	else dc3 . ByteString.pack . pad $ str
+	where
+		error_message :: String
+		error_message = "Input (" ++ str ++ ") not accepted (input string contains the NUL-terminator ('\\0'))."

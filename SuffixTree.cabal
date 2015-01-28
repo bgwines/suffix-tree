@@ -1,0 +1,35 @@
+Name:		   SuffixTree
+Version:	   1.0.1
+Synopsis:      Suffix Tree
+Description:   Suffix Tree
+Category:      Data Structures
+Cabal-Version: >= 1.6
+License:	   BSD3
+License-File:  LICENSE
+Stability:	Experimental
+Author:		Brett Wines
+Maintainer: bgwines@cs.stanford.edu
+Homepage:	https://github.com/bgwines/suffix-tree
+Build-Type: Simple
+Source-Repository head
+    type:     git
+    location: git://github.com/bgwines/suffix-tree.git
+
+Library
+  Build-Depends:
+    Zora,
+    base,
+    containers,
+    array,
+    text,
+    bytestring,
+    QuickCheck
+
+  Exposed-Modules:
+    SuffixTree
+    SuffixArray
+
+Test-Suite test-suffixtree
+    type:       exitcode-stdio-1.0
+    main-is:    test-suffix.hs
+    build-depends: base
