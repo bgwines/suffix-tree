@@ -8,7 +8,7 @@ module FusedCTree
 , FusedCTree.get_children
 , FusedCTree.is_empty
 , FusedCTree.empty
-, G.graph
+, G.render
 ) where
 
 import qualified CTree

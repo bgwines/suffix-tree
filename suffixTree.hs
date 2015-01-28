@@ -106,10 +106,10 @@ make_graphable (Internal cmap) s = GInternal cmap'
 			( ZList.subseq (fromIntegral i) (fromIntegral n) s
 			, make_graphable child s )
 
-graph :: SuffixTree -> IO String
-graph Empty = return "Empty tree -- nothing to graph."
-graph (SuffixTree str stree)
-	= G.graph
+graph :: SuffixTree -> String -> IO ()
+graph Empty outfile_name = return ()
+graph (SuffixTree str stree) outfile_name
+	= G.render outfile_name
 	. flip make_graphable (ByteString.unpack str)
 	$ stree
 

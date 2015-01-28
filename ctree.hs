@@ -8,7 +8,7 @@ module CTree
 , CTree.right_child
 , CTree.value
 , CTree.is_empty
-, G.graph
+, G.render
 ) where
 
 import qualified Data.Map as M
