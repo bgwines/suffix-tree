@@ -1,5 +1,5 @@
 Name:		   SuffixStructures
-Version:	   1.0.3
+Version:	   1.0.4
 Synopsis:      Suffix tree and suffix array
 Description:   Suffix tree and suffix array
 Category:      Data Structures
@@ -22,10 +22,16 @@ Library
     containers,
     array,
     text,
-    bytestring
+    bytestring,
+    QuickCheck
 
   Exposed-Modules:
     SuffixStructures.SuffixTree
     SuffixStructures.SuffixArray
     SuffixStructures.CTree
     SuffixStructures.FusedCTree
+
+Test-Suite test-suffix
+    type:       exitcode-stdio-1.0
+    main-is:    Tests/test-suffix.hs
+    build-depends: base

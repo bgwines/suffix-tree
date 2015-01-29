@@ -2,8 +2,8 @@ module Main where
 
 import System.Exit
 
-import qualified SuffixArray as SA
-import qualified SuffixTree as ST
+import qualified SuffixStructures.SuffixArray as SA
+import qualified SuffixStructures.SuffixTree as ST
 
 import qualified Data.List as List
 
