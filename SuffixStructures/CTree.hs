@@ -1,13 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module CTree
+module SuffixStructures.CTree
 ( CTree(..)
-, CTree.fromList
-, CTree.left_child
-, CTree.right_child
-, CTree.value
-, CTree.is_empty
+, fromList
+, left_child
+, right_child
+, value
+, is_empty
 , G.render
 ) where
 

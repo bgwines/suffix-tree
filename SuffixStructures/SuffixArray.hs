@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module SuffixArray
+module SuffixStructures.SuffixArray
 ( SuffixArray(..)
 , construct
 , construct_naive -- for testing

@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module SuffixTree
+module SuffixStructures.SuffixTree
 ( SuffixTree(..)
-, SuffixTree.construct
+, construct
 , contains_substring
 , graph
 ) where
@@ -18,13 +18,13 @@ import Data.Char
 import Data.Maybe
 import Data.Monoid
 
-import qualified CTree
-import qualified FusedCTree
+import qualified SuffixStructures.CTree as CTree
+import qualified SuffixStructures.FusedCTree as FusedCTree
 
 import qualified Zora.List as ZList
 import qualified Zora.Graphing.DAGGraphing as G
 
-import qualified SuffixArray as SA
+import qualified SuffixStructures.SuffixArray as SA
 
 ----------------------------------------------------------
 --                 Algebraic Data Types                 --

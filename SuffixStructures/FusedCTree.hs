@@ -1,17 +1,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module FusedCTree
+module SuffixStructures.FusedCTree
 ( FusedCTree(..)
-, FusedCTree.fuse
-, FusedCTree.value
-, FusedCTree.get_children
-, FusedCTree.is_empty
-, FusedCTree.empty
+, fuse
+, value
+, get_children
+, is_empty
+, empty
 , G.render
 ) where
 
-import qualified CTree
+import qualified SuffixStructures.CTree as CTree
 
 import qualified Zora.Graphing.DAGGraphing as G
 
@@ -44,7 +44,7 @@ get_children (Node _ children) = children
 
 fuse :: forall a . (Eq a) => CTree.CTree a -> FusedCTree a
 fuse cnode
-	| (CTree.is_empty cnode) = FusedCTree.Empty
+	| (CTree.is_empty cnode) = Empty
 	| otherwise = Node e children
 		where
 			e :: a
